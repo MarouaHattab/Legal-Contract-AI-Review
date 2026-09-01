@@ -1,3 +1,10 @@
+"""
+Phase 1 : Plain Python PDF-to-Markdown pipeline.
+Usage:
+    $ python process_pdf.py s3://my-pdfs-bucket/reports/annual_report.pdf
+
+"""
+
 import os 
 import sys
 import tempfile
@@ -78,3 +85,23 @@ def upload_markdown(markdown_text:str,orginal_s3_path:str)->str:
     output_path = f"s3://{bucket}/{md_key}"
     log.info(f"Uploaded markdown to {output_path}")
     return output_path
+
+
+# main pipeline function
+
+
+def process_pdf(s3_input_path: str) -> str:
+    log.info(f"Starting PDF processing for {s3_input_path}")
+    local_pdf= download_pdf_from_s3(s3_input_path)
+    markdown= extract_pdf_to_markdown(local_pdf)
+    output_s3 = upload_markdown(markdown, s3_input_path)
+    #clean up temp file 
+    os.remove(local_pdf)
+    log.info(f"Pipeline complete. Markdown uploaded to {output_s3}")
+    return output_s3
+
+if __name__ == "__main__":
+    output_s3 = process_pdf(
+        sys.argv[1]
+        )
+    log.info(f"Pipeline finished. Result: {output_s3}")
