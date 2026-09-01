@@ -51,3 +51,11 @@ def download_pdf_from_s3(s3_path: str) -> str:
     )
     log.info(f"Downloaded {local_path}")
     return local_path
+
+# step 2: Exttract to Markdown
+
+def extract_pdf_to_markdown(local_pdf_path: str) -> str:
+    log.info(f"Extracting text from {local_pdf_path}")
+    markdown_text = pymupdf4llm.to_markdown(local_pdf_path)
+    log.info(f"Extraction complete, length of text: {len(markdown_text)} characters")
+    return markdown_text
