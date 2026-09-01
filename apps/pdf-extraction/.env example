@@ -5,3 +5,8 @@ AWS_S3_ENDPOINT_URL=https://s3.us-west-2.idrivee2.com
 
 S3_BUCKET=temporal-dev
 TEMP_DIR=/tmp/pdf-pipeline
+
+# Temporal
+TEMPORAL_HOST=localhost:7233
+TEMPORAL_NAMESPACE=default
+TEMPORAL_PDF_PROCESS_TASK_QUEUE=pdf-pipeline-queue
