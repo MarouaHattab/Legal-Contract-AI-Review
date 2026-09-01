@@ -3,6 +3,8 @@ import sys
 import tempfile
 import logging
 from pathlib import Path
+
+from altair import Key
 import boto3
 import pymupdf4llm
 from dotenv import load_dotenv
@@ -59,3 +61,20 @@ def extract_pdf_to_markdown(local_pdf_path: str) -> str:
     markdown_text = pymupdf4llm.to_markdown(local_pdf_path)
     log.info(f"Extraction complete, length of text: {len(markdown_text)} characters")
     return markdown_text
+
+# step 3: Upload the Markdown to S3 
+def upload_markdown(markdown_text:str,orginal_s3_path:str)->str:
+    bucket, key = parse_s3_path(orginal_s3_path)
+    md_key =Key.replace(".pdf", ".md")
+    log.info(f"Uploading markdown to s3://{bucket}/{md_key}")
+    s3_client = get_s3_client()
+    s3_client.put_object(
+        Bucket=bucket,
+        Key=md_key,
+        Body=markdown_text.encode("utf-8"),
+        ContentType="text/markdown"
+    )
+
+    output_path = f"s3://{bucket}/{md_key}"
+    log.info(f"Uploaded markdown to {output_path}")
+    return output_path
