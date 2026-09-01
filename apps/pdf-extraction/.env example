@@ -1,0 +1,6 @@
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+AWS_REGION=us-west-2
+AWS_S3_ENDPOINT_URL=https://s3.us-west-2.idrivee2.com
+
+S3_BUCKET=temporal-dev
