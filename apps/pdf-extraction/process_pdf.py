@@ -2,14 +2,14 @@
 Phase 1: Plain Python PDF-to-Markdown pipeline.
 
 Usage:
-    python process_pdf.py s3://my-pdfs-bucket/reports/annual_report.pdf
+    python process_pdf.py s3://temporal-dev/files/cisco-88xx-user-guide.pdf
 """
 
 import logging
 import os
 import sys
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import boto3
 import pymupdf4llm
@@ -56,6 +56,12 @@ def parse_s3_path(s3_path: str) -> tuple[str, str]:
         raise ValueError(f"Invalid S3 path: {s3_path}")
 
     return bucket, key
+
+
+def markdown_s3_key(s3_key: str) -> str:
+    return PurePosixPath(s3_key).with_suffix(".md").name
+
+
 # Step 1: Download PDF
 def download_pdf_from_s3(s3_path: str) -> str:
     bucket, key = parse_s3_path(s3_path)
@@ -97,7 +103,7 @@ def upload_markdown(
 ) -> str:
     bucket, key = parse_s3_path(original_s3_path)
 
-    md_key = str(Path(key).with_suffix(".md"))
+    md_key = markdown_s3_key(key)
 
     log.info("Uploading Markdown to s3://%s/%s", bucket, md_key)
 
