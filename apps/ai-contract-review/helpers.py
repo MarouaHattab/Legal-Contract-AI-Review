@@ -11,6 +11,11 @@ API_KEY=os.environ["OPENROUTER_API_KEY"],
 BASE_URL=os.environ["BASE_URL"],
 MODEL=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 
+
+TEMPORAL_HOST       = os.environ["TEMPORAL_HOST"]
+TEMPORAL_NAMESPACE  = os.environ["TEMPORAL_NAMESPACE"]
+TEMPORAL_TASK_QUEUE = os.environ["TEMPORAL_TASK_QUEUE"]
+
 # Dataclasses 
 @dataclass
 class ExtractPDFInput:
@@ -41,7 +46,16 @@ class PDFSummaryOutput:
     summary:str
     key_risks:str    
 
+@dataclass
+class ContractReviewInput:
+    s3_paths: list
+    max_revisions: int = 2
 
+@dataclass
+class ContractReviewOutput:
+    report: str
+    sources: list
+    approved_by: str
 #  S3 helper 
 
 def get_s3_client():

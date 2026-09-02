@@ -4,36 +4,18 @@ import textwrap
 import json_repair
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from .helpers import PDFSummaryInput, PDFSummaryOutput
 with workflow.unsafe.imports_passed_through():
-    from .activities import extract_pdf, call_llm
-    from .helpers import (
+    from helpers import PDFSummaryInput, PDFSummaryOutput
+    from activities import extract_pdf, call_llm
+    from helpers import (
         ExtractPDFInput,
         ExtractPDFOutput,
         CallLLMInput,
         CallLLMOutput,
     )
 
+from prompts import _SUMMARY_PROMPT
 
-
-_SUMMARY_PROMPT = textwrap.dedent("""\
-    You are a legal analyst reviewing a contract excerpt.
-
-    Identify the key obligations, rights, and risks for the parties involved.
-
-    Return ONLY a JSON object with exactly these two fields — no markdown, no code block:
-    {{
-      "summary": "2-3 sentence plain-English summary of what this contract covers and the main obligations of each party",
-      "key_risks": "bullet list of the top 3-5 risks, one per line, starting with a dash (e.g. - Risk description)"
-    }}
-
-    Contract text:
-    {text}
-                                  
-    # Output:
-    
-    ```json                              
-    """)
 DEFAULT_RETRY_POLICY = RetryPolicy(
     initial_interval=timedelta(seconds=3),
     backoff_coefficient=2.0,

@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from temporalio import activity
 
-from .helpers import (
+from helpers import (
     ExtractPDFInput,
     ExtractPDFOutput,
     CallLLMInput,
