@@ -10,6 +10,7 @@ TEMP_DIR=/tmp/pdf-pipeline
 # OpenRouter
 OPENROUTER_API_KEY=your-openrouter-api-key
 OPENROUTER_MODEL=deepseek/deepseek-v4-flash
+BASE_URL=https://openrouter.ai/api/v1
 
 # Temporal
 TEMPORAL_HOST=localhost:7233

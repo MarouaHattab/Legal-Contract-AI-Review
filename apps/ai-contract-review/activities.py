@@ -18,6 +18,9 @@ from .helpers import (
     CallLLMOutput,
     get_s3_client,
     parse_s3_path,
+    BASE_URL,
+    API_KEY,
+    MODEL,
 )
 
 # activity 1 : extract pdf from S3
@@ -96,4 +99,25 @@ async def extract_pdf(params: ExtractPDFInput) -> ExtractPDFOutput:
 
 @activity.defn
 async def call_llm(params: CallLLMInput) -> CallLLMOutput:
-    pass
+    activity.logger.info(f"Calling LLM ")
+    activity.heartbeat(
+        {
+            "stage":"calling_llm",
+            "prompt_chars": len(params.prompt),
+        }
+    )
+
+    llm_client = OpenAI(
+        api_key=API_KEY,
+        base_url=BASE_URL,
+    )
+    response = llm_client.chat.completions.create(
+        model=MODEL,
+        messages=[{"role": "user", "content": params.prompt}],
+        max_tokens=8000,
+    )
+
+    content = response.choices[0].message.content
+    activity.logger.info(f"LLM returned {len(content)} characters")
+
+    return CallLLMOutput(content=content)
