@@ -91,9 +91,16 @@ async def get_workflow_status(workflow_id:str):
     client = await get_temporal_client()
     handle = client.get_workflow_handle(workflow_id)
     desc= await handle.describe()
+
+    try :
+        result = await handle.result()
+    except Exception as e:
+        result = None
+
     workflow_status = desc.status
 
     return {
         "workflow_id": workflow_id, 
-        "status": workflow_status.name
+        "status": workflow_status.name,
+        "workflow_result": result
             }
