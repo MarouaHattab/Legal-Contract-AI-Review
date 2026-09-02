@@ -25,6 +25,15 @@ from .helpers import (
 @activity.defn
 async def extract_pdf(params: ExtractPDFInput) -> ExtractPDFOutput:
     activity.logger.info(f"Starting extraction : {params.s3_path}")
+
+    activity.heartbeat(
+        {
+        "stage":"downloading",
+        "s3_path": params.s3_path,
+        "pages_done": 0,
+        "chars_extracted": 0,
+    }
+    )
     s3_client = get_s3_client()
     bucket, key = parse_s3_path(params.s3_path)
     filename = Path(key).name
@@ -50,7 +59,31 @@ async def extract_pdf(params: ExtractPDFInput) -> ExtractPDFOutput:
         )
         all_text_chunks.append(batch_md)
         total_chars_num += len(batch_md)
+
+        activity.heartbeat(
+            {
+                "stage":"extracting",
+                "s3_path": params.s3_path,
+                "pages_done": end_page,
+                "total_pages": total_pages,
+                "batch":f"{start_page+1}-{end_page}",
+                "chars_extracted": total_chars_num,
+                "progress_pct": round((end_page / total_pages) * 100, 2),
+            }
+        )
+
     full_md = "\n\n".join(all_text_chunks)
+
+    activity.heartbeat(
+        {
+            "stage":"done",
+            "s3_path": params.s3_path,
+            "pages_done": total_pages,
+            "total_pages": total_pages,
+            "chars_extracted": total_chars_num,
+        }
+    )
+
     return ExtractPDFOutput(
         s3_path=params.s3_path,
         markdown_text=full_md,
