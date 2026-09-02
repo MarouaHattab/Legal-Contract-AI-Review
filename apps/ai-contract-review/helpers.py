@@ -31,6 +31,17 @@ class CallLLMInput:
 class CallLLMOutput:
     content: str
 
+@dataclass
+class PDFSummaryInput:
+    s3_path:str
+
+@dataclass
+class PDFSummaryOutput:
+    s3_path:str
+    summary:str
+    key_risks:str    
+
+
 #  S3 helper 
 
 def get_s3_client():
