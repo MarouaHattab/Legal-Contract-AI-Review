@@ -32,7 +32,7 @@ class PDFProcessResponse(BaseModel):
 
 async def get_temporal_client() -> Client:
     return await Client.connect(
-        target=TEMPORAL_HOST,
+        TEMPORAL_HOST,
         namespace=TEMPORAL_NAMESPACE,
     )
 
@@ -49,7 +49,7 @@ async def process_pdf(request: PDFProcessRequest):
     client = await get_temporal_client()
 
     result = await client.execute_workflow(
-        "PDFProcessingWorkflow",
+        "PDFPipelineWorkflow",
         args =[
           {
             "s3_path": request.s3_path,
