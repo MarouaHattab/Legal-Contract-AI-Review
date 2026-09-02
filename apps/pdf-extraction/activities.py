@@ -40,6 +40,7 @@ async def download_pdf(params: DownloadInput) -> DownloadOutput:
 
 
 # ── Step 2: Extract to Markdown 
+@activity.defn
 async def extract_to_markdown(params: ExtractInput) -> ExtractOutput:
     """Extract text from PDF and convert to Markdown. Returns markdown string."""
     activity.logger.info(f"Extracting text from {params.local_path}")
