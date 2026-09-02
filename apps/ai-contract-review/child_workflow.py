@@ -34,7 +34,12 @@ _SUMMARY_PROMPT = textwrap.dedent("""\
     
     ```json                              
     """)
-
+DEFAULT_RETRY_POLICY = RetryPolicy(
+    initial_interval=timedelta(seconds=3),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(seconds=60),
+    maximum_attempts=4,
+) 
 @workflow.defn
 class PDFSummaryWorkflow:
     @workflow.run
@@ -42,7 +47,10 @@ class PDFSummaryWorkflow:
         #execute extract_pdf 
         extracted_md=await workflow.execute_activity(
             extract_pdf,
-            ExtractPDFInput(s3_path=params.s3_path)
+            ExtractPDFInput(s3_path=params.s3_path),
+            retry_policy=DEFAULT_RETRY_POLICY,
+            start_to_close_timeout=timedelta(minutes=20),
+            heartbeat_timeout=timedelta(seconds=30),
         )
 
         # execute call_llm
@@ -51,5 +59,15 @@ class PDFSummaryWorkflow:
             call_llm, 
             CallLLMInput(
                 prompt=prompt
-            )
+            ),
+            retry_policy=DEFAULT_RETRY_POLICY,
+            start_to_close_timeout=timedelta(minutes=5),
+            heartbeat_timeout=timedelta(seconds=180),
+        )
+
+        parsed_output=json_repair.loads(llm_result.content)
+        return PDFSummaryOutput(
+            s3_path=params.s3_path,
+            summary=parsed_output.get("summary",""),
+            key_risks=parsed_output.get("key_risks",""),
         )
