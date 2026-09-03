@@ -39,17 +39,40 @@ class ContractReviewWorkflow:
         self._review_feedback: str = ""
         self._approved_by: str = ""
 
-  #  Signal: record who is reviewing
 
+    # Query: status 
+    @workflow.query
+    def get_status(self) -> dict:
+
+        report = json.dumps(self._report, ensure_ascii=False) if isinstance(self._report, dict) else self._report
+        return {
+            "status":         self._status,
+            "pdfs_processed": len(self._summaries),
+            "report_preview": json.dumps(self._report, ensure_ascii=False)[:500],
+            "approved_by":    self._approved_by,
+        }
+    
+    # Query: full report — call this before submitting a review decision
+    @workflow.query
+    def get_report(self) -> dict:
+        return {
+            "status":      self._status,
+            "report":      self._report,
+            "approved_by": self._approved_by,
+            "sources":     [s["s3_path"] for s in self._summaries],
+        }
+
+    # Signal: record who is reviewing
     @workflow.signal
     async def assign_reviewer(self, name: str) -> None:
         self._approved_by = name
+
     @workflow.update
     async def submit_decision(self, decision: str, feedback: str = "") -> str:
         self._review_decision = decision
         self._review_feedback = feedback
 
-        return f"Decision '{decision}' recorded." 
+        return f"Decision '{decision}' recorded."
     
     @submit_decision.validator
     def validate_decision(self, decision: str, feedback: str = "") -> None:
@@ -58,12 +81,13 @@ class ContractReviewWorkflow:
         
         if decision == "revise" and not feedback.strip():
             raise ValueError("Feedback is required when requesting a revision.")
-   
+
+
 
     @workflow.run
     async def run(self, params: ContractReviewInput) -> ContractReviewOutput:
         
-        # Step 1 Fan-out — one child per PDF, all in parallel
+        # Step 1: Fan-out — one child per PDF, all in parallel
 
         self._status = "extracting"
 
@@ -71,41 +95,50 @@ class ContractReviewWorkflow:
 
         workflow_id = workflow.info().workflow_id
         workflow_task_queue = workflow.info().task_queue
+
+        # TERMINATE: kill child workflows when parent closes
+        # REQUEST_CANCEL: ask child workflows to cancel gracefully
+        # ABANDON: leave them alone and let them keep running
+
         handles = await asyncio.gather(
             *[
-                workflow.start_child_workflow(
-                    PDFSummaryWorkflow.run,
-                    PDFSummaryInput(s3_path=current_s3_path),
-                    id=f"{workflow_id}-pdf-{idx+1}",
-                    task_queue=workflow_task_queue,
-                    parent_close_policy=ParentClosePolicy.ABANDON,
-                )
-                for idx, current_s3_path in enumerate(params.s3_paths)
-                
-            ]
+
+               workflow.start_child_workflow(
+                   PDFSummaryWorkflow.run ,
+                   PDFSummaryInput(
+                       s3_path=current_s3_path
+                   ),
+                   id=f"{workflow_id}-pdf-{idx+1}",
+                   task_queue=workflow_task_queue,
+                   parent_close_policy=ParentClosePolicy.ABANDON
+               )
+
+               for idx, current_s3_path in enumerate(params.s3_paths)
+             ]
         )
+
         raw_results = await asyncio.gather(
             *handles,
             return_exceptions=True,
         )
 
-        for i,res in enumerate(raw_results):
-            if isinstance(res,Exception):
-                workflow.logger.warning(f"PDF {i} failed {res}")
-            else:
-                self._summaries.append(
-                    {
-                        "s3_path": res.s3_path,
-                        "summary": res.summary,
-                        "key_risks": res.key_risks,
-                    }
-                    )
-        if len(self._summaries) == 0:
-            raise ApplicationError("All PDF failed to process .")
+        for i, res in enumerate(raw_results):
 
-          # Step 2 Synthesize all summaries into a risk report
+            if isinstance(res, Exception):
+                workflow.logger.warning(f"PDF {i} failed: {res}")
+            else:
+                self._summaries.append({
+                    "s3_path":   res.s3_path,
+                    "summary":   res.summary,
+                    "key_risks": res.key_risks,
+                })
+
+        if len(self._summaries) == 0:
+            raise ApplicationError("All PDFs failed to process.")
+        
+        # Step 2: Synthesize all summaries into a risk report
         self._status = "analyzing"
-        workflow.logger.info(f"Synthesizing {len(self._summaries)} summaries into a risk report.")
+        workflow.logger.info(f"Synthesizing {len(self._summaries)} summaries")
 
         combined_summary = "\n\n".join([
 
@@ -115,7 +148,7 @@ class ContractReviewWorkflow:
 
             for i, summary in enumerate(self._summaries)
         ])
-        
+
         llm_prompt = _SYNTHESIS_PROMPT.format(
             summaries=combined_summary,
             n=len(self._summaries)
@@ -132,10 +165,8 @@ class ContractReviewWorkflow:
         )
 
         self._report = json_repair.loads(llm_result.content)
-       
+    
         # Step 3: HITL — pause until a human approves or requests revision.
-        # The reviewer should call get_report (Query) to read the full report
-        # before calling submit_decision (Update).
 
         for revision_no in range(params.max_revisions + 1):
 
@@ -152,6 +183,7 @@ class ContractReviewWorkflow:
             except asyncio.TimeoutError:
                 workflow.logger.warning("Review timed out after 3 days — auto-completing")
                 break
+
             if self._review_decision == "approve":
                 workflow.logger.info(f"Approved by: {self._approved_by}")
                 break
