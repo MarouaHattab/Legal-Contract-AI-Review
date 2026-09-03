@@ -39,6 +39,26 @@ class ContractReviewWorkflow:
         self._review_feedback: str = ""
         self._approved_by: str = ""
 
+  #  Signal: record who is reviewing
+
+    @workflow.signal
+    async def assign_reviewer(self, name: str) -> None:
+        self._approved_by = name
+    @workflow.update
+    async def submit_decision(self, decision: str, feedback: str = "") -> str:
+        self._review_decision = decision
+        self._review_feedback = feedback
+
+        return f"Decision '{decision}' recorded." 
+    
+    @submit_decision.validator
+    def validate_decision(self, decision: str, feedback: str = "") -> None:
+        if decision not in ("approve", "revise"):
+            raise ValueError(f"Must be 'approve' or 'revise', got: '{decision}'")
+        
+        if decision == "revise" and not feedback.strip():
+            raise ValueError("Feedback is required when requesting a revision.")
+   
 
     @workflow.run
     async def run(self, params: ContractReviewInput) -> ContractReviewOutput:
