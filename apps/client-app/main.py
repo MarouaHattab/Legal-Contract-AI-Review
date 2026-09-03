@@ -1,226 +1,329 @@
-
 import os
 import uuid
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 from temporalio.client import Client
 from temporalio.client import WorkflowExecutionStatus as WES
+from temporalio.client import WorkflowUpdateFailedError
+from temporalio.service import RPCError, RPCStatusCode
+
+from api_models import (
+    AssignRequest,
+    ContractReportQueryResponse,
+    ContractReviewResultResponse,
+    ContractWorkflowStatusResponse,
+    PDFArtifactResult,
+    PDFProcessExecuteResponse,
+    PDFProcessRequest,
+    PDFWorkflowResultResponse,
+    PDFWorkflowStatusResponse,
+    ReviewActionResponse,
+    ReviewDecisionRequest,
+    StartReviewRequest,
+    WorkflowStartResponse,
+)
+
 
 load_dotenv()
 
-TEMPORAL_HOST      = os.environ["TEMPORAL_HOST"]
+TEMPORAL_HOST = os.environ["TEMPORAL_HOST"]
 TEMPORAL_NAMESPACE = os.environ["TEMPORAL_NAMESPACE"]
 TEMPORAL_PDF_PROCESS_TASK_QUEUE = os.environ["TEMPORAL_PDF_PROCESS_TASK_QUEUE"]
-TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE = os.environ["TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE"]
+TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE = os.environ[
+    "TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE"
+]
+
 
 app = FastAPI(
-    title="PDF Extraction Client",
-    description="Submits PDF processing jobs to Temporal and returns the result.",
-    version="1.0.0",
+    title="Temporal Document Processing API",
+    description="Starts and reviews durable PDF and contract workflows.",
+    version="1.1.0",
 )
-
-class PDFProcessRequest(BaseModel):
-    s3_path: str
-
-class PDFProcessExecuteResponse(BaseModel):
-    workflow_id: str
-    results: dict
-
-class PDFProcessStartResponse(BaseModel):
-    workflow_id: str
-
-class StartReviewRequest(BaseModel):
-    s3_paths: list[str]
-    max_revisions: int = 2
-
-class AssignRequest(BaseModel):
-    name: str
-
-class ReviseRequest(BaseModel):
-    feedback: str
 
 
 async def get_temporal_client() -> Client:
-    return await Client.connect(
-        TEMPORAL_HOST,
-        namespace=TEMPORAL_NAMESPACE,
+    return await Client.connect(TEMPORAL_HOST, namespace=TEMPORAL_NAMESPACE)
+
+
+def _service_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, RPCError) and exc.status == RPCStatusCode.NOT_FOUND:
+        return HTTPException(status_code=404, detail="Workflow not found.")
+    return HTTPException(
+        status_code=503,
+        detail="Temporal service is currently unavailable.",
     )
 
 
-# routes 
+async def _describe_workflow(workflow_id: str):
+    try:
+        client = await get_temporal_client()
+        handle = client.get_workflow_handle(workflow_id)
+        return handle, await handle.describe()
+    except Exception as exc:
+        raise _service_error(exc) from exc
+
+
+def _terminal_status(status: WES) -> str:
+    if status == WES.COMPLETED:
+        return "completed"
+    if status == WES.CANCELED:
+        return "cancelled"
+    if status == WES.TIMED_OUT:
+        return "timed_out"
+    return "failed"
+
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
-@app.post("/process_pdf/execute",response_model=PDFProcessExecuteResponse)
-async def process_pdf(request: PDFProcessRequest):
+
+@app.post(
+    "/process_pdf/execute",
+    response_model=PDFProcessExecuteResponse,
+)
+async def execute_pdf(request: PDFProcessRequest):
     workflow_id = f"pdf_pipeline_{uuid.uuid4()}"
-    client = await get_temporal_client()
-
-    result = await client.execute_workflow(
-        "PDFPipelineWorkflow",
-        args =[
-          {
-            "s3_path": request.s3_path,
-          }
-        ], 
-        id=workflow_id,
-        task_queue=TEMPORAL_PDF_PROCESS_TASK_QUEUE,
-        result_type=dict,
-    )
-
+    try:
+        client = await get_temporal_client()
+        result = await client.execute_workflow(
+            "PDFPipelineWorkflow",
+            args=[{"s3_path": request.s3_path}],
+            id=workflow_id,
+            task_queue=TEMPORAL_PDF_PROCESS_TASK_QUEUE,
+            result_type=dict,
+        )
+    except Exception as exc:
+        raise _service_error(exc) from exc
     return PDFProcessExecuteResponse(workflow_id=workflow_id, results=result)
 
 
-@app.post("/process_pdf/start",response_model=PDFProcessStartResponse)
-async def process_pdf(request: PDFProcessRequest):
+@app.post(
+    "/process_pdf/start",
+    response_model=WorkflowStartResponse,
+)
+async def start_pdf(request: PDFProcessRequest):
     workflow_id = f"pdf_pipeline_{uuid.uuid4()}"
-    client = await get_temporal_client()
+    try:
+        client = await get_temporal_client()
+        await client.start_workflow(
+            "PDFPipelineWorkflow",
+            args=[{"s3_path": request.s3_path}],
+            id=workflow_id,
+            task_queue=TEMPORAL_PDF_PROCESS_TASK_QUEUE,
+            result_type=dict,
+        )
+    except Exception as exc:
+        raise _service_error(exc) from exc
+    return WorkflowStartResponse(workflow_id=workflow_id)
 
-    result = await client.start_workflow(
-        "PDFPipelineWorkflow",
-        args =[
-          {
-            "s3_path": request.s3_path,
-          }
-        ], 
-        id=workflow_id,
-        task_queue=TEMPORAL_PDF_PROCESS_TASK_QUEUE,
-        result_type=dict,
+
+@app.get(
+    "/process_pdf/{workflow_id}/status",
+    response_model=PDFWorkflowStatusResponse,
+)
+async def get_pdf_status(workflow_id: str):
+    handle, description = await _describe_workflow(workflow_id)
+    phase = _terminal_status(description.status)
+    if description.status == WES.RUNNING:
+        try:
+            state = await handle.query("get_status", result_type=dict)
+        except Exception as exc:
+            raise _service_error(exc) from exc
+        phase = state.get("phase", "processing")
+
+    return PDFWorkflowStatusResponse(
+        workflow_id=workflow_id,
+        execution_status=description.status.name,
+        phase=phase,
+        result_available=description.status != WES.RUNNING,
     )
 
-    return PDFProcessStartResponse(workflow_id=workflow_id)
 
+@app.get(
+    "/process_pdf/{workflow_id}/result",
+    response_model=PDFWorkflowResultResponse,
+)
+async def get_pdf_result(workflow_id: str):
+    handle, description = await _describe_workflow(workflow_id)
+    if description.status == WES.RUNNING:
+        raise HTTPException(
+            status_code=409,
+            detail="Workflow is still running; poll the status endpoint.",
+        )
+    if description.status != WES.COMPLETED:
+        return PDFWorkflowResultResponse(
+            workflow_id=workflow_id,
+            execution_status=description.status.name,
+            final_status=_terminal_status(description.status),
+            error="Workflow ended without a PDF artifact.",
+        )
 
-
-@app.get("/workflow/status/{workflow_id}")
-async def get_workflow_status(workflow_id:str):
-    client = await get_temporal_client()
-    handle = client.get_workflow_handle(workflow_id)
-    desc= await handle.describe()
-
-    try :
+    try:
         result = await handle.result()
-    except Exception as e:
-        result = None
-
-    workflow_status = desc.status
-
-    return {
-        "workflow_id": workflow_id, 
-        "status": workflow_status.name,
-        "workflow_result": result
-            }
+    except Exception as exc:
+        raise _service_error(exc) from exc
+    return PDFWorkflowResultResponse(
+        workflow_id=workflow_id,
+        execution_status=description.status.name,
+        final_status="completed",
+        result=PDFArtifactResult.model_validate(result),
+    )
 
 
-# CONTRACT REVIEW
-
-
-@app.post("/contract-review/start")
+@app.post(
+    "/contract-review/start",
+    response_model=WorkflowStartResponse,
+)
 async def start_contract_review(request: StartReviewRequest):
-    
     workflow_id = f"contract-review-{uuid.uuid4()}"
+    try:
+        client = await get_temporal_client()
+        await client.start_workflow(
+            "ContractReviewWorkflow",
+            args=[
+                {
+                    "s3_paths": request.s3_paths,
+                    "max_revisions": request.max_revisions,
+                }
+            ],
+            id=workflow_id,
+            task_queue=TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE,
+        )
+    except Exception as exc:
+        raise _service_error(exc) from exc
+    return WorkflowStartResponse(workflow_id=workflow_id)
 
-    client = await get_temporal_client()
 
-    await client.start_workflow(
-        "ContractReviewWorkflow",
-        args=[{
-            "s3_paths": request.s3_paths,
-            "max_revisions": request.max_revisions
-        }],
-        id=workflow_id,
-        task_queue=TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE,
-    )
-
-    return {"workflow_id": workflow_id}
-
-
-@app.get("/contract-review/{workflow_id}/status")
+@app.get(
+    "/contract-review/{workflow_id}/status",
+    response_model=ContractWorkflowStatusResponse,
+)
 async def get_review_status(workflow_id: str):
-
-    """Temporal execution status + brief workflow state (Query)."""
-    
-    client = await get_temporal_client()
-    handle = client.get_workflow_handle(workflow_id)
-    desc = await handle.describe()
-
-    workflow_state = None
-    if desc.status == WES.RUNNING:
+    handle, description = await _describe_workflow(workflow_id)
+    if description.status in (WES.RUNNING, WES.COMPLETED):
         try:
-            workflow_state = await handle.query("get_status", result_type=dict)
-        except Exception as e:
-            workflow_state = {"error": str(e)}
-    
-    return {
-        "workflow_id": workflow_id,
-        "execution_status": desc.status.name,
-        "workflow_state": workflow_state,
-    }
+            state = await handle.query("get_status", result_type=dict)
+        except Exception as exc:
+            if description.status == WES.RUNNING:
+                raise _service_error(exc) from exc
+            state = {
+                "phase": "completed",
+                "current_revision": 0,
+                "reviewer": "",
+                "completeness": "unknown",
+                "documents": [],
+                "report_available": True,
+            }
+    else:
+        state = {
+            "phase": _terminal_status(description.status),
+            "current_revision": 0,
+            "reviewer": "",
+            "completeness": "unknown",
+            "documents": [],
+            "report_available": False,
+        }
 
-@app.get("/contract-review/{workflow_id}/report")
+    return ContractWorkflowStatusResponse(
+        workflow_id=workflow_id,
+        execution_status=description.status.name,
+        result_available=description.status != WES.RUNNING,
+        **state,
+    )
+
+
+@app.get(
+    "/contract-review/{workflow_id}/report",
+    response_model=ContractReportQueryResponse,
+)
 async def get_review_report(workflow_id: str):
+    handle, description = await _describe_workflow(workflow_id)
+    if description.status != WES.RUNNING:
+        raise HTTPException(
+            status_code=409,
+            detail="Workflow is terminal; use the result endpoint.",
+        )
+    try:
+        report = await handle.query("get_report", result_type=dict)
+    except Exception as exc:
+        raise _service_error(exc) from exc
+    return ContractReportQueryResponse(workflow_id=workflow_id, **report)
 
-    """Temporal execution report + brief workflow state (Query)."""
-    
-    client = await get_temporal_client()
-    handle = client.get_workflow_handle(workflow_id)
-    desc = await handle.describe()
 
-    workflow_report = None
-    if desc.status == WES.RUNNING:
-        try:
-            workflow_report = await handle.query("get_report", result_type=dict)
-        except Exception as e:
-            workflow_report = {"error": str(e)}
-    
-    return {
-        "workflow_id": workflow_id,
-        "execution_report": desc.status.name,
-        "workflow_report": workflow_report,
-    }
+@app.get(
+    "/contract-review/{workflow_id}/result",
+    response_model=ContractReviewResultResponse,
+)
+async def get_review_result(workflow_id: str):
+    handle, description = await _describe_workflow(workflow_id)
+    if description.status == WES.RUNNING:
+        raise HTTPException(
+            status_code=409,
+            detail="Workflow is still running; poll the status endpoint.",
+        )
+    if description.status != WES.COMPLETED:
+        return ContractReviewResultResponse(
+            workflow_id=workflow_id,
+            execution_status=description.status.name,
+            final_status=_terminal_status(description.status),
+            completeness="failed",
+            report=None,
+            documents=[],
+            reviewer="",
+            revision_count=0,
+            error="Workflow ended without a domain result.",
+        )
 
-@app.post("/contract-review/{workflow_id}/assign")
+    try:
+        result = await handle.result()
+    except Exception as exc:
+        raise _service_error(exc) from exc
+    return ContractReviewResultResponse(
+        workflow_id=workflow_id,
+        execution_status=description.status.name,
+        **result,
+    )
+
+
+@app.post(
+    "/contract-review/{workflow_id}/assign",
+    response_model=ReviewActionResponse,
+)
 async def assign_reviewer(workflow_id: str, request: AssignRequest):
-
-    client = await get_temporal_client()
-    handle = client.get_workflow_handle(workflow_id)
-
-    await handle.signal(
-        "assign_reviewer", request.name
+    try:
+        client = await get_temporal_client()
+        handle = client.get_workflow_handle(workflow_id)
+        await handle.signal("assign_reviewer", request.name)
+    except Exception as exc:
+        raise _service_error(exc) from exc
+    return ReviewActionResponse(
+        status="accepted",
+        message=f"Reviewer '{request.name}' assigned.",
     )
 
-    return {"status": "ok", 
-            "message": f"Reviewer '{request.name}' assigned."}
 
-
-@app.post("/contract-review/{workflow_id}/revise")
-async def submit_revise(workflow_id: str, request: ReviseRequest):
-
-    client = await get_temporal_client()
-    handle = client.get_workflow_handle(workflow_id)
-
-    result = await handle.execute_update(
-        "submit_decision", args=[
-            "revise", request.feedback
-        ]
-    )
-
-    return {"ok": True, "message": result}
-
-
-@app.get("/contract-review/{workflow_id}/approve")
-async def submit_approve(workflow_id: str):
-
-    client = await get_temporal_client()
-    handle = client.get_workflow_handle(workflow_id)
-
-    result = await handle.execute_update(
-        "submit_decision", args=[
-            "approve", ""
-        ]
-    )
+@app.post(
+    "/contract-review/{workflow_id}/decision",
+    response_model=ReviewActionResponse,
+)
+async def submit_review_decision(
+    workflow_id: str,
+    request: ReviewDecisionRequest,
+):
+    command = request.model_dump()
+    try:
+        client = await get_temporal_client()
+        handle = client.get_workflow_handle(workflow_id)
+        message = await handle.execute_update("submit_review", command)
+    except WorkflowUpdateFailedError as exc:
+        detail = (
+            str(exc.cause)
+            if exc.cause is not None
+            else "Review decision was rejected for the current workflow state."
+        )
+        raise HTTPException(status_code=409, detail=detail) from exc
+    except Exception as exc:
+        raise _service_error(exc) from exc
+    return ReviewActionResponse(status="accepted", message=message)
