@@ -2,7 +2,9 @@ import os
 import boto3
 from dataclasses import dataclass
 from dotenv import load_dotenv
+from pathlib import PurePosixPath
 from typing import Optional
+from urllib.parse import urlsplit
 
 
 load_dotenv()
@@ -23,10 +25,10 @@ class ExtractPDFInput:
     s3_path: str
     batch_size: int = 2
 
-@dataclass
-class ExtractPDFOutput:
-    s3_path: str
-    markdown_text: str
+@dataclass(frozen=True)
+class ExtractContractArtifactOutput:
+    source_s3_path: str
+    artifact: "ArtifactReference"
     page_count: int
 
 @dataclass
@@ -45,7 +47,10 @@ class PDFSummaryInput:
 class PDFSummaryOutput:
     s3_path:str
     summary:str
-    key_risks:str    
+    key_risks:str
+    chunks_processed: int
+    characters_processed: int
+    artifact: "ArtifactReference"
 
 @dataclass
 class ContractReviewInput:
@@ -123,7 +128,38 @@ def get_s3_client():
         endpoint_url=os.environ["AWS_S3_ENDPOINT_URL"],
     )
 
-def parse_s3_path(s3_path: str):
-    s3_path_no_scheme = s3_path.replace("s3://", "")
-    bucket, _, key =  s3_path_no_scheme.partition("/")
-    return bucket, key
+def parse_s3_path(s3_path: str) -> tuple[str, str]:
+    parsed = urlsplit(s3_path)
+    key = parsed.path.removeprefix("/")
+    if (
+        parsed.scheme != "s3"
+        or not parsed.netloc
+        or not key
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+        or parsed.port
+    ):
+        raise ValueError(f"Invalid S3 URI: {s3_path!r}")
+    return parsed.netloc, key
+
+
+def derive_contract_artifact_key(source_key: str, sha256: str) -> str:
+    source_path = PurePosixPath(source_key)
+    if (
+        not source_key
+        or source_key.startswith("/")
+        or source_path.name.lower() == ".pdf"
+        or source_path.suffix.lower() != ".pdf"
+    ):
+        raise ValueError(f"Expected a PDF object key, got: {source_key!r}")
+    if len(sha256) != 64 or any(char not in "0123456789abcdef" for char in sha256):
+        raise ValueError("sha256 must be a lowercase hexadecimal digest")
+
+    source_without_suffix = source_path.with_suffix("")
+    return str(
+        PurePosixPath("derived/contracts")
+        / source_without_suffix
+        / f"{sha256}.md"
+    )

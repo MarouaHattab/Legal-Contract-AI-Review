@@ -1,20 +1,14 @@
 from dataclasses import dataclass
 from datetime import timedelta
-import textwrap
-import json_repair
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from helpers import PDFSummaryInput, PDFSummaryOutput
-    from activities import extract_pdf, call_llm
+    from activities import analyze_contract_artifact, extract_contract_artifact
     from helpers import (
+        AnalyzeContractInput,
         ExtractPDFInput,
-        ExtractPDFOutput,
-        CallLLMInput,
-        CallLLMOutput,
     )
-
-from prompts import _SUMMARY_PROMPT
 
 DEFAULT_RETRY_POLICY = RetryPolicy(
     initial_interval=timedelta(seconds=3),
@@ -26,30 +20,30 @@ DEFAULT_RETRY_POLICY = RetryPolicy(
 class PDFSummaryWorkflow:
     @workflow.run
     async def run(self,params:PDFSummaryInput) -> PDFSummaryOutput:
-        #execute extract_pdf 
-        extracted_md=await workflow.execute_activity(
-            extract_pdf,
+        extracted = await workflow.execute_activity(
+            extract_contract_artifact,
             ExtractPDFInput(s3_path=params.s3_path),
             retry_policy=DEFAULT_RETRY_POLICY,
             start_to_close_timeout=timedelta(minutes=20),
             heartbeat_timeout=timedelta(seconds=30),
         )
 
-        # execute call_llm
-        prompt = _SUMMARY_PROMPT.format(text=extracted_md.markdown_text[:5_000])
-        llm_result=await workflow.execute_activity(
-            call_llm, 
-            CallLLMInput(
-                prompt=prompt
+        analysis = await workflow.execute_activity(
+            analyze_contract_artifact,
+            AnalyzeContractInput(
+                source_s3_path=params.s3_path,
+                artifact=extracted.artifact,
             ),
             retry_policy=DEFAULT_RETRY_POLICY,
-            start_to_close_timeout=timedelta(minutes=5),
+            start_to_close_timeout=timedelta(minutes=30),
             heartbeat_timeout=timedelta(seconds=180),
         )
 
-        parsed_output=json_repair.loads(llm_result.content)
         return PDFSummaryOutput(
             s3_path=params.s3_path,
-            summary=parsed_output.get("summary",""),
-            key_risks=parsed_output.get("key_risks",""),
+            summary=analysis.summary,
+            key_risks=analysis.key_risks,
+            chunks_processed=analysis.chunks_processed,
+            characters_processed=analysis.characters_processed,
+            artifact=analysis.artifact,
         )

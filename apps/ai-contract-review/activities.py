@@ -1,27 +1,28 @@
 import os
+import hashlib
 import math
 import tempfile
 from pathlib import Path
 from dataclasses import dataclass
 
-import boto3
 import fitz                 
 import json_repair
 import pymupdf4llm
-from dotenv import load_dotenv
 from openai import OpenAI
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from helpers import (
     AnalyzeContractInput,
+    ArtifactReference,
     ContractReport,
     DocumentAnalysis,
+    ExtractContractArtifactOutput,
     ExtractPDFInput,
-    ExtractPDFOutput,
     CallLLMInput,
     CallLLMOutput,
     get_s3_client,
+    derive_contract_artifact_key,
     parse_s3_path,
     BASE_URL,
     API_KEY,
@@ -206,79 +207,110 @@ def analyze_contract_artifact(params: AnalyzeContractInput) -> DocumentAnalysis:
         artifact=params.artifact,
     )
 
-# activity 1 : extract pdf from S3
 
 @activity.defn
-async def extract_pdf(params: ExtractPDFInput) -> ExtractPDFOutput:
-    activity.logger.info(f"Starting extraction : {params.s3_path}")
+def extract_contract_artifact(
+    params: ExtractPDFInput,
+) -> ExtractContractArtifactOutput:
+    """Extract a PDF into a durable, content-addressed Markdown artifact."""
+    if params.batch_size <= 0:
+        raise ApplicationError(
+            "batch_size must be positive",
+            type="InvalidPDFInput",
+            non_retryable=True,
+        )
 
-    activity.heartbeat(
-        {
-        "stage":"downloading",
-        "s3_path": params.s3_path,
-        "pages_done": 0,
-        "chars_extracted": 0,
-    }
-    )
+    try:
+        bucket, key = parse_s3_path(params.s3_path)
+        if Path(key).suffix.lower() != ".pdf":
+            raise ValueError(f"Expected a PDF object key, got: {key!r}")
+    except ValueError as exc:
+        raise ApplicationError(
+            str(exc),
+            type="InvalidPDFInput",
+            non_retryable=True,
+        ) from exc
+
+    temp_root = Path(os.environ["TEMP_DIR"])
+    temp_root.mkdir(parents=True, exist_ok=True)
     s3_client = get_s3_client()
-    bucket, key = parse_s3_path(params.s3_path)
-    filename = Path(key).name
-    TEMP_DIR = Path(os.environ["TEMP_DIR"])
-    local_path =str(Path(TEMP_DIR) / filename)
 
-    s3_client.download_file(bucket, key, local_path)
-
-    doc = fitz.open(local_path)
-    total_pages = doc.page_count
-    activity.logger.info(f"Downloaded {total_pages} pages from {params.s3_path}")
-    all_text_chunks = []
-    total_chars_num = 0
-
-    num_batches = math.ceil(total_pages / params.batch_size)
-
-    for batch_idx in range(num_batches):
-        start_page = batch_idx * params.batch_size
-        end_page = min(start_page + params.batch_size, total_pages)
-        batch_md= pymupdf4llm.to_markdown(
-            local_path,
-            pages = list(range(start_page, end_page)),
-        )
-        all_text_chunks.append(batch_md)
-        total_chars_num += len(batch_md)
-
+    with tempfile.TemporaryDirectory(
+        prefix="temporal-contract-",
+        dir=temp_root,
+    ) as work_dir:
+        local_path = Path(work_dir) / "source.pdf"
         activity.heartbeat(
-            {
-                "stage":"extracting",
-                "s3_path": params.s3_path,
-                "pages_done": end_page,
-                "total_pages": total_pages,
-                "batch":f"{start_page+1}-{end_page}",
-                "chars_extracted": total_chars_num,
-                "progress_pct": round((end_page / total_pages) * 100, 2),
-            }
+            {"stage": "downloading", "s3_path": params.s3_path, "pages_done": 0}
+        )
+        s3_client.download_file(bucket, key, str(local_path))
+
+        with fitz.open(str(local_path)) as document:
+            total_pages = document.page_count
+
+        if total_pages <= 0:
+            raise ApplicationError(
+                "PDF contains no pages",
+                type="EmptyContract",
+                non_retryable=True,
+            )
+
+        all_text_chunks: list[str] = []
+        num_batches = math.ceil(total_pages / params.batch_size)
+        for batch_index in range(num_batches):
+            start_page = batch_index * params.batch_size
+            end_page = min(start_page + params.batch_size, total_pages)
+            all_text_chunks.append(
+                pymupdf4llm.to_markdown(
+                    str(local_path),
+                    pages=list(range(start_page, end_page)),
+                )
+            )
+            activity.heartbeat(
+                {
+                    "stage": "extracting",
+                    "s3_path": params.s3_path,
+                    "pages_done": end_page,
+                    "total_pages": total_pages,
+                }
+            )
+
+        markdown_bytes = "\n".join(all_text_chunks).encode("utf-8")
+
+    digest = hashlib.sha256(markdown_bytes).hexdigest()
+    artifact_key = derive_contract_artifact_key(key, digest)
+    if artifact_key == key:
+        raise ApplicationError(
+            "Refusing to overwrite the source PDF object",
+            type="UnsafeOutputKey",
+            non_retryable=True,
         )
 
-    full_md = "\n\n".join(all_text_chunks)
-
+    s3_client.put_object(
+        Bucket=bucket,
+        Key=artifact_key,
+        Body=markdown_bytes,
+        ContentType="text/markdown",
+    )
+    artifact = ArtifactReference(
+        s3_path=f"s3://{bucket}/{artifact_key}",
+        sha256=digest,
+        size_bytes=len(markdown_bytes),
+        content_type="text/markdown",
+    )
     activity.heartbeat(
         {
-            "stage":"done",
+            "stage": "done",
             "s3_path": params.s3_path,
             "pages_done": total_pages,
-            "total_pages": total_pages,
-            "chars_extracted": total_chars_num,
+            "artifact": artifact.s3_path,
         }
     )
-
-    return ExtractPDFOutput(
-        s3_path=params.s3_path,
-        markdown_text=full_md,
+    return ExtractContractArtifactOutput(
+        source_s3_path=params.s3_path,
+        artifact=artifact,
         page_count=total_pages,
     )
-
-
-
-# activity 2 : call the llm via openrouter 
 
 @activity.defn
 async def call_llm(params: CallLLMInput) -> CallLLMOutput:

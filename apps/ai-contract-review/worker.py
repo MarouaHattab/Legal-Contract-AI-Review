@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from activities import extract_pdf, call_llm
+from activities import analyze_contract_artifact, call_llm, extract_contract_artifact
 from child_workflow import PDFSummaryWorkflow
 from parent_workflow import ContractReviewWorkflow
 
@@ -26,7 +26,7 @@ async def main():
         temporal_client,
         task_queue=TEMPORAL_TASK_QUEUE,
         workflows=[ContractReviewWorkflow, PDFSummaryWorkflow],
-        activities=[extract_pdf, call_llm],
+        activities=[extract_contract_artifact, analyze_contract_artifact, call_llm],
     )
 
     print(f"Worker running on: '{TEMPORAL_TASK_QUEUE}'")
