@@ -77,6 +77,12 @@ class DocumentAnalysis:
 
 
 @dataclass(frozen=True)
+class AnalyzeContractInput:
+    source_s3_path: str
+    artifact: ArtifactReference
+
+
+@dataclass(frozen=True)
 class DocumentOutcome:
     s3_path: str
     status: str
