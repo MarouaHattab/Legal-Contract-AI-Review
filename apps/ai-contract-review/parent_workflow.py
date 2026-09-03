@@ -26,7 +26,7 @@ DEFAULT_RETRY_POLICY = RetryPolicy(
     maximum_interval=timedelta(seconds=60),
     maximum_attempts=4,
 ) 
-from prompts import _SYNTHESIS_PROMPT
+from prompts import _SYNTHESIS_PROMPT, _REVISION_PROMPT
 @workflow.defn
 class ContractReviewWorkflow:
 
@@ -112,9 +112,55 @@ class ContractReviewWorkflow:
         )
 
         self._report = json_repair.loads(llm_result.content)
+       
+        # Step 3: HITL — pause until a human approves or requests revision.
+        # The reviewer should call get_report (Query) to read the full report
+        # before calling submit_decision (Update).
+
+        for revision_no in range(params.max_revisions + 1):
+
+            self._status = "awaiting-review"
+            workflow.logger.info(f"Waiting for human review (cycle {revision_no})")
+
+            self._review_decision = None
+
+            try:
+                await workflow.wait_condition(
+                    lambda: self._review_decision is not None,
+                    timeout=timedelta(days=3),
+                )
+            except asyncio.TimeoutError:
+                workflow.logger.warning("Review timed out after 3 days — auto-completing")
+                break
+            if self._review_decision == "approve":
+                workflow.logger.info(f"Approved by: {self._approved_by}")
+                break
+
+            self._status = "revising"
+            workflow.logger.info(f"Revising — feedback: {self._review_feedback}")
+
+            llm_prompt = _REVISION_PROMPT.format(
+                report=json.dumps(
+                    self._report, ensure_ascii=False, indent=2
+                ),
+
+                feedback=self._review_feedback,
+            )
+
+            revised_report = await workflow.execute_activity(
+                call_llm,
+                CallLLMInput(prompt=llm_prompt),
+                start_to_close_timeout=timedelta(minutes=3),
+                heartbeat_timeout=timedelta(seconds=180),
+                retry_policy=DEFAULT_RETRY_POLICY,
+            )
+
+            self._report = json_repair.loads(revised_report.content)
+
+        # REVISED COMPLETED
+        self._status = "completed"
         return ContractReviewOutput(
-            status=self._status,
-            report=self._report.get("report",""),
-            sources=self._report.get("sources",[]),
-            approved_by=self._report.get("approved_by",""),
+            report=self._report,
+            sources=[s["s3_path"] for s in self._summaries],
+            approved_by=self._approved_by,
         )
