@@ -110,6 +110,18 @@ class ReviewCommand:
 
 
 @dataclass(frozen=True)
+class SynthesizeReportInput:
+    documents: list[DocumentOutcome]
+    completeness: str
+
+
+@dataclass(frozen=True)
+class ReviseReportInput:
+    report: ContractReport
+    feedback: str
+
+
+@dataclass(frozen=True)
 class ContractReviewResult:
     final_status: str
     completeness: str

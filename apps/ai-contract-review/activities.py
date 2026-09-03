@@ -1,9 +1,10 @@
 import os
 import hashlib
+import json
 import math
 import tempfile
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 import fitz                 
 import json_repair
@@ -19,6 +20,8 @@ from helpers import (
     DocumentAnalysis,
     ExtractContractArtifactOutput,
     ExtractPDFInput,
+    ReviseReportInput,
+    SynthesizeReportInput,
     CallLLMInput,
     CallLLMOutput,
     get_s3_client,
@@ -28,7 +31,12 @@ from helpers import (
     API_KEY,
     MODEL,
 )
-from prompts import _CHUNK_ANALYSIS_PROMPT, _DOCUMENT_AGGREGATION_PROMPT
+from prompts import (
+    _CHUNK_ANALYSIS_PROMPT,
+    _DOCUMENT_AGGREGATION_PROMPT,
+    _REVISION_PROMPT,
+    _SYNTHESIS_PROMPT,
+)
 
 
 MAX_CHUNK_CHARACTERS = 12_000
@@ -311,6 +319,61 @@ def extract_contract_artifact(
         artifact=artifact,
         page_count=total_pages,
     )
+
+
+@activity.defn
+def synthesize_contract_report(params: SynthesizeReportInput) -> ContractReport:
+    successful = [
+        document
+        for document in params.documents
+        if document.status == "succeeded" and document.analysis is not None
+    ]
+    if not successful:
+        raise ApplicationError(
+            "No successful documents are available for synthesis",
+            type="NoDocumentsToSynthesize",
+            non_retryable=True,
+        )
+
+    summaries = "\n\n".join(
+        f"**Contract {index + 1}** (`{document.s3_path}`):\n"
+        f"Summary: {document.analysis.summary}\n"
+        f"Risks: {document.analysis.key_risks}"
+        for index, document in enumerate(successful)
+    )
+    prompt = _SYNTHESIS_PROMPT.format(
+        n=len(successful),
+        summaries=(
+            f"Analysis completeness: {params.completeness}.\n"
+            f"{summaries}"
+        ),
+    )
+    activity.heartbeat(
+        {"stage": "synthesizing", "documents": len(successful)}
+    )
+    report = parse_contract_report(_call_llm_content(prompt))
+    activity.logger.info("Synthesized %s successful documents", len(successful))
+    return report
+
+
+@activity.defn
+def revise_contract_report(params: ReviseReportInput) -> ContractReport:
+    feedback = params.feedback.strip()
+    if not feedback:
+        raise ApplicationError(
+            "Revision feedback is required",
+            type="InvalidRevisionFeedback",
+            non_retryable=True,
+        )
+
+    prompt = _REVISION_PROMPT.format(
+        report=json.dumps(asdict(params.report), ensure_ascii=False, indent=2),
+        feedback=feedback,
+    )
+    activity.heartbeat({"stage": "revising", "feedback_chars": len(feedback)})
+    report = parse_contract_report(_call_llm_content(prompt))
+    activity.logger.info("Revised contract report")
+    return report
 
 @activity.defn
 async def call_llm(params: CallLLMInput) -> CallLLMOutput:
