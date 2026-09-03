@@ -7,7 +7,7 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 from workflow_process_pdf import PDFPipelineWorkflow
-from activities import (download_pdf, extract_to_markdown, upload_markdown)
+from activities import convert_pdf_to_markdown
 
 load_dotenv()
 
@@ -25,7 +25,7 @@ async def main():
         temporal_client,
         task_queue=TEMPORAL_PDF_PROCESS_TASK_QUEUE,
         workflows=[PDFPipelineWorkflow],
-        activities=[download_pdf, extract_to_markdown, upload_markdown]
+        activities=[convert_pdf_to_markdown]
     )
     print(f"Worker for task queue '{TEMPORAL_PDF_PROCESS_TASK_QUEUE}' started. Listening for workflow tasks...")
     await worker_pdf_process.run()

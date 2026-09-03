@@ -6,22 +6,18 @@ from temporalio.common import RetryPolicy
 
 
 with workflow.unsafe.imports_passed_through():
-    from activities import (
-        download_pdf, extract_to_markdown, upload_markdown,
-    )
-
-    from helpers import (
-        DownloadInput, DownloadOutput,
-        ExtractInput, ExtractOutput,
-        UploadInput, UploadOutput
-    )
+    from activities import convert_pdf_to_markdown
+    from helpers import ConvertPDFInput
 
 @dataclass
 class PDFPipelineInput:
     s3_path: str # exmple : "s3://bucket/reports/annual-report.pdf"
 @dataclass
 class PDFPipelineOutput:
-    output_s3_path: str # example : "s3://bucket/reports/annual-report.md"
+    output_s3_path: str
+    sha256: str
+    size_bytes: int
+    content_type: str
 
 DEFAULT_RETRY = RetryPolicy(
     # Wait 2 seconds before the first retry.
@@ -41,37 +37,32 @@ DEFAULT_RETRY = RetryPolicy(
 )
 @workflow.defn
 class PDFPipelineWorkflow:
+    def __init__(self) -> None:
+        self._phase = "queued"
+
+    @workflow.query
+    def get_status(self) -> dict:
+        return {"phase": self._phase}
+
     @workflow.run
     async def run(self,params: PDFPipelineInput) -> PDFPipelineOutput:
         workflow.logger.info(f"Starting PDF Pipeline for {params.s3_path}")
-        #step 1: Download PDF from S3
-        download_result = await workflow.execute_activity(
-            download_pdf,
-            DownloadInput(s3_path=params.s3_path),
+        self._phase = "processing"
+        converted = await workflow.execute_activity(
+            convert_pdf_to_markdown,
+            ConvertPDFInput(s3_path=params.s3_path),
             retry_policy=DEFAULT_RETRY,
-            start_to_close_timeout=timedelta(minutes=3) # Set a timeout for the download activity
+            start_to_close_timeout=timedelta(minutes=15),
         )
 
-        # step 2: Extract text from PDF and convert to Markdown
-
-        extract_result = await workflow.execute_activity(
-            extract_to_markdown,
-            ExtractInput(local_path=download_result.local_path),
-            retry_policy=DEFAULT_RETRY,
-            start_to_close_timeout=timedelta(minutes=10) # Set a timeout for the extraction activity
+        self._phase = "completed"
+        artifact = converted.artifact
+        workflow.logger.info(
+            f"PDF Pipeline completed for {params.s3_path}. Output: {artifact.s3_path}"
         )
-
-        # step 3: Upload Markdown to S3
-        upload_result = await workflow.execute_activity(
-            upload_markdown,
-            UploadInput(
-                markdown_text=extract_result.markdown_text,
-                original_s3_path=params.s3_path,
-            ),
-            retry_policy=DEFAULT_RETRY,
-            start_to_close_timeout=timedelta(minutes=3) # Set a timeout for the upload activity
-        )
-        workflow.logger.info(f"PDF Pipeline completed for {params.s3_path}. Output: {upload_result.output_s3_path}")
         return PDFPipelineOutput(
-            output_s3_path=upload_result.output_s3_path
+            output_s3_path=artifact.s3_path,
+            sha256=artifact.sha256,
+            size_bytes=artifact.size_bytes,
+            content_type=artifact.content_type,
         )

@@ -19,30 +19,22 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 # ── Input / Output dataclasses ────────────────────────────────────────────────
 # Temporal serializes these to/from JSON automatically.
 
-@dataclass
-class DownloadInput:
+@dataclass(frozen=True)
+class ArtifactReference:
+    s3_path: str
+    sha256: str
+    size_bytes: int
+    content_type: str
+
+
+@dataclass(frozen=True)
+class ConvertPDFInput:
     s3_path: str
 
-@dataclass
-class DownloadOutput:
-    local_path: str
 
-@dataclass
-class ExtractInput:
-    local_path: str
-
-@dataclass
-class ExtractOutput:
-    markdown_text: str
-
-@dataclass
-class UploadInput:
-    markdown_text: str
-    original_s3_path: str
-
-@dataclass
-class UploadOutput:
-    output_s3_path: str   # e.g. "s3://bucket/reports/annual-report.md"
+@dataclass(frozen=True)
+class ConvertPDFOutput:
+    artifact: ArtifactReference
 
 
 # ── S3 helper ────────────────────────────────────────────────────────────────
