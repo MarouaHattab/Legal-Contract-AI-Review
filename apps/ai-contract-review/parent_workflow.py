@@ -1,23 +1,27 @@
 import asyncio
-import textwrap
-from dataclasses import dataclass
+from dataclasses import asdict
 from datetime import timedelta
 from typing import Optional
-import json_repair
-import json
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ParentClosePolicy
-with workflow.unsafe.imports_passed_through():
-    from helpers import ContractReviewInput, ContractReviewOutput
-    from activities import  call_llm
-    from helpers import (
-        CallLLMInput,
-    )
-    from child_workflow import PDFSummaryWorkflow, PDFSummaryInput
 
+with workflow.unsafe.imports_passed_through():
+    from activities import revise_contract_report, synthesize_contract_report
+    from child_workflow import PDFSummaryWorkflow
+    from helpers import (
+        ContractReport,
+        ContractReviewInput,
+        ContractReviewResult,
+        DocumentAnalysis,
+        DocumentOutcome,
+        PDFSummaryInput,
+        ReviseReportInput,
+        ReviewCommand,
+        SynthesizeReportInput,
+    )
 
 
 DEFAULT_RETRY_POLICY = RetryPolicy(
@@ -25,194 +29,261 @@ DEFAULT_RETRY_POLICY = RetryPolicy(
     backoff_coefficient=2.0,
     maximum_interval=timedelta(seconds=60),
     maximum_attempts=4,
-) 
-from prompts import _SYNTHESIS_PROMPT, _REVISION_PROMPT
+)
+REVIEW_TIMEOUT = timedelta(days=3)
+MAX_DOCUMENTS = 20
+MAX_REVISIONS = 10
+
+
 @workflow.defn
 class ContractReviewWorkflow:
+    def __init__(self) -> None:
+        self._phase = "processing"
+        self._documents: list[DocumentOutcome] = []
+        self._report: Optional[ContractReport] = None
+        self._reviewer = ""
+        self._current_revision = 0
+        self._pending_review: Optional[ReviewCommand] = None
+        self._completeness = "pending"
 
-    def __init__(self):
-        self._status: str = "processing"
-        self._summaries: list = []
-        self._report: str = ""
-
-        self._review_decision: Optional[str] = None
-        self._review_feedback: str = ""
-        self._approved_by: str = ""
-
-
-    # Query: status 
     @workflow.query
     def get_status(self) -> dict:
+        documents = []
+        for document in self._documents:
+            item = {
+                "s3_path": document.s3_path,
+                "status": document.status,
+                "error": document.error,
+            }
+            if document.analysis is not None:
+                item.update(
+                    {
+                        "chunks_processed": document.analysis.chunks_processed,
+                        "characters_processed": document.analysis.characters_processed,
+                        "artifact_s3_path": document.analysis.artifact.s3_path,
+                    }
+                )
+            documents.append(item)
 
-        report = json.dumps(self._report, ensure_ascii=False) if isinstance(self._report, dict) else self._report
         return {
-            "status":         self._status,
-            "pdfs_processed": len(self._summaries),
-            "report_preview": json.dumps(self._report, ensure_ascii=False)[:500],
-            "approved_by":    self._approved_by,
+            "phase": self._phase,
+            "current_revision": self._current_revision,
+            "reviewer": self._reviewer,
+            "completeness": self._completeness,
+            "documents": documents,
+            "report_available": self._report is not None,
         }
-    
-    # Query: full report — call this before submitting a review decision
+
     @workflow.query
     def get_report(self) -> dict:
         return {
-            "status":      self._status,
-            "report":      self._report,
-            "approved_by": self._approved_by,
-            "sources":     [s["s3_path"] for s in self._summaries],
+            "phase": self._phase,
+            "current_revision": self._current_revision,
+            "reviewer": self._reviewer,
+            "completeness": self._completeness,
+            "report": asdict(self._report) if self._report is not None else None,
+            "documents": [asdict(document) for document in self._documents],
         }
 
-    # Signal: record who is reviewing
     @workflow.signal
     async def assign_reviewer(self, name: str) -> None:
-        self._approved_by = name
+        normalized = name.strip()
+        if normalized:
+            self._reviewer = normalized
 
     @workflow.update
-    async def submit_decision(self, decision: str, feedback: str = "") -> str:
-        self._review_decision = decision
-        self._review_feedback = feedback
+    async def submit_review(self, command: ReviewCommand) -> str:
+        self._pending_review = command
+        return (
+            f"Decision '{command.decision}' accepted for revision "
+            f"{command.expected_revision}."
+        )
 
-        return f"Decision '{decision}' recorded."
-    
-    @submit_decision.validator
-    def validate_decision(self, decision: str, feedback: str = "") -> None:
-        if decision not in ("approve", "revise"):
-            raise ValueError(f"Must be 'approve' or 'revise', got: '{decision}'")
-        
-        if decision == "revise" and not feedback.strip():
+    @submit_review.validator
+    def validate_review(self, command: ReviewCommand) -> None:
+        if self._phase != "awaiting_review":
+            raise ValueError("The workflow is not awaiting human review.")
+        if not self._reviewer:
+            raise ValueError("A reviewer must be assigned before submitting a decision.")
+        if self._pending_review is not None:
+            raise ValueError("A review decision is already pending.")
+        if command.expected_revision != self._current_revision:
+            raise ValueError(
+                "Stale review decision: expected revision "
+                f"{self._current_revision}, got {command.expected_revision}."
+            )
+        if command.decision not in ("approve", "revise"):
+            raise ValueError("Decision must be 'approve' or 'revise'.")
+        if command.decision == "revise" and not command.feedback.strip():
             raise ValueError("Feedback is required when requesting a revision.")
 
-
-
-    @workflow.run
-    async def run(self, params: ContractReviewInput) -> ContractReviewOutput:
-        
-        # Step 1: Fan-out — one child per PDF, all in parallel
-
-        self._status = "extracting"
-
-        workflow.logger.info(f"Fanning out to {len(params.s3_paths)} child workflows")
-
-        workflow_id = workflow.info().workflow_id
-        workflow_task_queue = workflow.info().task_queue
-
-        # TERMINATE: kill child workflows when parent closes
-        # REQUEST_CANCEL: ask child workflows to cancel gracefully
-        # ABANDON: leave them alone and let them keep running
-
-        handles = await asyncio.gather(
-            *[
-
-               workflow.start_child_workflow(
-                   PDFSummaryWorkflow.run ,
-                   PDFSummaryInput(
-                       s3_path=current_s3_path
-                   ),
-                   id=f"{workflow_id}-pdf-{idx+1}",
-                   task_queue=workflow_task_queue,
-                   parent_close_policy=ParentClosePolicy.ABANDON
-               )
-
-               for idx, current_s3_path in enumerate(params.s3_paths)
-             ]
-        )
-
-        raw_results = await asyncio.gather(
-            *handles,
-            return_exceptions=True,
-        )
-
-        for i, res in enumerate(raw_results):
-
-            if isinstance(res, Exception):
-                workflow.logger.warning(f"PDF {i} failed: {res}")
-            else:
-                self._summaries.append({
-                    "s3_path":   res.s3_path,
-                    "summary":   res.summary,
-                    "key_risks": res.key_risks,
-                })
-
-        if len(self._summaries) == 0:
-            raise ApplicationError("All PDFs failed to process.")
-        
-        # Step 2: Synthesize all summaries into a risk report
-        self._status = "analyzing"
-        workflow.logger.info(f"Synthesizing {len(self._summaries)} summaries")
-
-        combined_summary = "\n\n".join([
-
-            f"**Contract {i+1}** (`{summary['s3_path']}`):\n"
-            f"Summary: {summary['summary']}\n"
-            f"Risks: {summary['key_risks']}"
-
-            for i, summary in enumerate(self._summaries)
-        ])
-
-        llm_prompt = _SYNTHESIS_PROMPT.format(
-            summaries=combined_summary,
-            n=len(self._summaries)
-        )
-
-        llm_result = await workflow.execute_activity(
-            call_llm,
-            CallLLMInput(
-                prompt=llm_prompt
-            ),
-            start_to_close_timeout=timedelta(minutes=3),
-            heartbeat_timeout=timedelta(seconds=180),
-            retry_policy=DEFAULT_RETRY_POLICY,
-        )
-
-        self._report = json_repair.loads(llm_result.content)
-    
-        # Step 3: HITL — pause until a human approves or requests revision.
-
-        for revision_no in range(params.max_revisions + 1):
-
-            self._status = "awaiting-review"
-            workflow.logger.info(f"Waiting for human review (cycle {revision_no})")
-
-            self._review_decision = None
-
-            try:
-                await workflow.wait_condition(
-                    lambda: self._review_decision is not None,
-                    timeout=timedelta(days=3),
-                )
-            except asyncio.TimeoutError:
-                workflow.logger.warning("Review timed out after 3 days — auto-completing")
-                break
-
-            if self._review_decision == "approve":
-                workflow.logger.info(f"Approved by: {self._approved_by}")
-                break
-
-            self._status = "revising"
-            workflow.logger.info(f"Revising — feedback: {self._review_feedback}")
-
-            llm_prompt = _REVISION_PROMPT.format(
-                report=json.dumps(
-                    self._report, ensure_ascii=False, indent=2
-                ),
-
-                feedback=self._review_feedback,
+    def _validate_input(self, params: ContractReviewInput) -> None:
+        if not params.s3_paths:
+            raise ApplicationError(
+                "At least one contract document is required.",
+                type="InvalidWorkflowInput",
+                non_retryable=True,
+            )
+        if len(params.s3_paths) > MAX_DOCUMENTS:
+            raise ApplicationError(
+                f"At most {MAX_DOCUMENTS} contract documents are allowed.",
+                type="InvalidWorkflowInput",
+                non_retryable=True,
+            )
+        if len(set(params.s3_paths)) != len(params.s3_paths):
+            raise ApplicationError(
+                "Duplicate contract documents are not allowed.",
+                type="InvalidWorkflowInput",
+                non_retryable=True,
+            )
+        if not 0 <= params.max_revisions <= MAX_REVISIONS:
+            raise ApplicationError(
+                f"max_revisions must be between 0 and {MAX_REVISIONS}.",
+                type="InvalidWorkflowInput",
+                non_retryable=True,
             )
 
-            revised_report = await workflow.execute_activity(
-                call_llm,
-                CallLLMInput(prompt=llm_prompt),
-                start_to_close_timeout=timedelta(minutes=3),
+    def _result(self, final_status: str) -> ContractReviewResult:
+        return ContractReviewResult(
+            final_status=final_status,
+            completeness=self._completeness,
+            report=self._report,
+            documents=self._documents,
+            reviewer=self._reviewer,
+            revision_count=self._current_revision,
+        )
+
+    async def _process_documents(self, params: ContractReviewInput) -> None:
+        self._phase = "extracting"
+        workflow_id = workflow.info().workflow_id
+        task_queue = workflow.info().task_queue
+        handles = await asyncio.gather(
+            *[
+                workflow.start_child_workflow(
+                    PDFSummaryWorkflow.run,
+                    PDFSummaryInput(s3_path=s3_path),
+                    id=f"{workflow_id}-pdf-{index + 1}",
+                    task_queue=task_queue,
+                    parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
+                )
+                for index, s3_path in enumerate(params.s3_paths)
+            ]
+        )
+        raw_results = await asyncio.gather(*handles, return_exceptions=True)
+
+        for s3_path, result in zip(params.s3_paths, raw_results):
+            if isinstance(result, Exception):
+                workflow.logger.warning("Contract document failed: %s", s3_path)
+                self._documents.append(
+                    DocumentOutcome(
+                        s3_path=s3_path,
+                        status="failed",
+                        error="Document processing failed after retries.",
+                    )
+                )
+                continue
+
+            self._documents.append(
+                DocumentOutcome(
+                    s3_path=s3_path,
+                    status="succeeded",
+                    analysis=DocumentAnalysis(
+                        summary=result.summary,
+                        key_risks=result.key_risks,
+                        chunks_processed=result.chunks_processed,
+                        characters_processed=result.characters_processed,
+                        artifact=result.artifact,
+                    ),
+                )
+            )
+
+        succeeded = sum(
+            document.status == "succeeded" for document in self._documents
+        )
+        if succeeded == 0:
+            self._completeness = "failed"
+        elif succeeded == len(self._documents):
+            self._completeness = "complete"
+        else:
+            self._completeness = "partial"
+
+    async def _await_human_review(
+        self,
+        params: ContractReviewInput,
+    ) -> ContractReviewResult:
+        while True:
+            # Clear the prior command before advertising that this cycle is ready.
+            self._pending_review = None
+            self._phase = "awaiting_review"
+            try:
+                await workflow.wait_condition(
+                    lambda: self._pending_review is not None,
+                    timeout=REVIEW_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                self._phase = "timed_out"
+                return self._result("timed_out")
+
+            command = self._pending_review
+            if command is None:
+                raise ApplicationError(
+                    "Review state was unexpectedly empty.",
+                    type="InvalidReviewState",
+                    non_retryable=True,
+                )
+            self._pending_review = None
+
+            if command.decision == "approve":
+                self._phase = "approved"
+                return self._result("approved")
+
+            if self._current_revision >= params.max_revisions:
+                self._phase = "revision_limit_reached"
+                return self._result("revision_limit_reached")
+
+            self._phase = "revising"
+            if self._report is None:
+                raise ApplicationError(
+                    "A report is required before revision.",
+                    type="InvalidReviewState",
+                    non_retryable=True,
+                )
+            self._report = await workflow.execute_activity(
+                revise_contract_report,
+                ReviseReportInput(
+                    report=self._report,
+                    feedback=command.feedback,
+                ),
+                start_to_close_timeout=timedelta(minutes=5),
                 heartbeat_timeout=timedelta(seconds=180),
                 retry_policy=DEFAULT_RETRY_POLICY,
             )
+            self._current_revision += 1
 
-            self._report = json_repair.loads(revised_report.content)
+    @workflow.run
+    async def run(self, params: ContractReviewInput) -> ContractReviewResult:
+        try:
+            self._validate_input(params)
+            await self._process_documents(params)
+            if self._completeness == "failed":
+                self._phase = "failed"
+                return self._result("failed")
 
-        # REVISED COMPLETED
-        self._status = "completed"
-        return ContractReviewOutput(
-            report=self._report,
-            sources=[s["s3_path"] for s in self._summaries],
-            approved_by=self._approved_by,
-        )
+            self._phase = "analyzing"
+            self._report = await workflow.execute_activity(
+                synthesize_contract_report,
+                SynthesizeReportInput(
+                    documents=self._documents,
+                    completeness=self._completeness,
+                ),
+                start_to_close_timeout=timedelta(minutes=5),
+                heartbeat_timeout=timedelta(seconds=180),
+                retry_policy=DEFAULT_RETRY_POLICY,
+            )
+            return await self._await_human_review(params)
+        except asyncio.CancelledError:
+            self._phase = "cancelled"
+            raise
+        except Exception:
+            self._phase = "failed"
+            raise

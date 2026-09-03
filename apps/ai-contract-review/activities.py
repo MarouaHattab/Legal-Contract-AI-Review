@@ -22,8 +22,6 @@ from helpers import (
     ExtractPDFInput,
     ReviseReportInput,
     SynthesizeReportInput,
-    CallLLMInput,
-    CallLLMOutput,
     get_s3_client,
     derive_contract_artifact_key,
     parse_s3_path,
@@ -374,18 +372,3 @@ def revise_contract_report(params: ReviseReportInput) -> ContractReport:
     report = parse_contract_report(_call_llm_content(prompt))
     activity.logger.info("Revised contract report")
     return report
-
-@activity.defn
-async def call_llm(params: CallLLMInput) -> CallLLMOutput:
-    activity.logger.info(f"Calling LLM ")
-    activity.heartbeat(
-        {
-            "stage":"calling_llm",
-            "prompt_chars": len(params.prompt),
-        }
-    )
-
-    content = _call_llm_content(params.prompt)
-    activity.logger.info(f"LLM returned {len(content)} characters")
-
-    return CallLLMOutput(content=content)

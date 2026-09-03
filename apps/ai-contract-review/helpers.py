@@ -32,14 +32,6 @@ class ExtractContractArtifactOutput:
     page_count: int
 
 @dataclass
-class CallLLMInput:
-    prompt: str
-
-@dataclass
-class CallLLMOutput:
-    content: str
-
-@dataclass
 class PDFSummaryInput:
     s3_path:str
 
@@ -56,13 +48,6 @@ class PDFSummaryOutput:
 class ContractReviewInput:
     s3_paths: list
     max_revisions: int = 2
-
-@dataclass
-class ContractReviewOutput:
-    report: str
-    sources: list
-    approved_by: str
-
 
 @dataclass(frozen=True)
 class ArtifactReference:
