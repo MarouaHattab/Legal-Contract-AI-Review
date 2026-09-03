@@ -2,6 +2,7 @@ import os
 import boto3
 from dataclasses import dataclass
 from dotenv import load_dotenv
+from typing import Optional
 
 
 load_dotenv()
@@ -56,6 +57,55 @@ class ContractReviewOutput:
     report: str
     sources: list
     approved_by: str
+
+
+@dataclass(frozen=True)
+class ArtifactReference:
+    s3_path: str
+    sha256: str
+    size_bytes: int
+    content_type: str
+
+
+@dataclass(frozen=True)
+class DocumentAnalysis:
+    summary: str
+    key_risks: str
+    chunks_processed: int
+    characters_processed: int
+    artifact: ArtifactReference
+
+
+@dataclass(frozen=True)
+class DocumentOutcome:
+    s3_path: str
+    status: str
+    analysis: Optional[DocumentAnalysis] = None
+    error: str = ""
+
+
+@dataclass(frozen=True)
+class ContractReport:
+    overall_risk_level: str
+    top_cross_contract_risks: str
+    recommended_actions: str
+
+
+@dataclass(frozen=True)
+class ReviewCommand:
+    decision: str
+    feedback: str = ""
+    expected_revision: int = 0
+
+
+@dataclass(frozen=True)
+class ContractReviewResult:
+    final_status: str
+    completeness: str
+    report: Optional[ContractReport]
+    documents: list[DocumentOutcome]
+    reviewer: str
+    revision_count: int
 #  S3 helper 
 
 def get_s3_client():
