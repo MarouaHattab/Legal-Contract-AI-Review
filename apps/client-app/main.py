@@ -32,6 +32,10 @@ class PDFProcessExecuteResponse(BaseModel):
 class PDFProcessStartResponse(BaseModel):
     workflow_id: str
 
+class StartReviewRequest(BaseModel):
+    s3_paths: list[str]
+    max_revisions: int = 2
+
 
 async def get_temporal_client() -> Client:
     return await Client.connect(
@@ -86,7 +90,8 @@ async def process_pdf(request: PDFProcessRequest):
     return PDFProcessStartResponse(workflow_id=workflow_id)
 
 
-@app.get("/process_pdf/status/{workflow_id}")
+
+@app.get("/workflow/status/{workflow_id}")
 async def get_workflow_status(workflow_id:str):
     client = await get_temporal_client()
     handle = client.get_workflow_handle(workflow_id)
@@ -104,3 +109,26 @@ async def get_workflow_status(workflow_id:str):
         "status": workflow_status.name,
         "workflow_result": result
             }
+
+
+# CONTRACT REVIEW
+
+
+@app.post("/contract-review/start")
+async def start_contract_review(request: StartReviewRequest):
+    
+    workflow_id = f"contract-review-{uuid.uuid4()}"
+
+    client = await get_temporal_client()
+
+    await client.start_workflow(
+        "ContractReviewWorkflow",
+        args=[{
+            "s3_paths": request.s3_paths,
+            "max_revisions": request.max_revisions
+        }],
+        id=workflow_id,
+        task_queue=TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE,
+    )
+
+    return {"workflow_id": workflow_id}

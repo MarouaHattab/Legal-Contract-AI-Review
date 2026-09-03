@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-API_KEY=os.environ["OPENROUTER_API_KEY"],
-BASE_URL=os.environ["BASE_URL"],
+API_KEY=os.environ["OPENROUTER_API_KEY"]
+BASE_URL=os.environ["BASE_URL"]
 MODEL=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 
 
@@ -40,7 +40,7 @@ class CallLLMOutput:
 class PDFSummaryInput:
     s3_path:str
 
-@dataclass
+@dataclass(frozen=True)
 class PDFSummaryOutput:
     s3_path:str
     summary:str

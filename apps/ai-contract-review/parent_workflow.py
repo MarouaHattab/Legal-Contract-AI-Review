@@ -65,7 +65,7 @@ class ContractReviewWorkflow:
             ]
         )
         raw_results = await asyncio.gather(
-            *[h.result() for h in handles],
+            *handles,
             return_exceptions=True,
         )
 
@@ -112,3 +112,9 @@ class ContractReviewWorkflow:
         )
 
         self._report = json_repair.loads(llm_result.content)
+        return ContractReviewOutput(
+            status=self._status,
+            report=self._report.get("report",""),
+            sources=self._report.get("sources",[]),
+            approved_by=self._report.get("approved_by",""),
+        )
