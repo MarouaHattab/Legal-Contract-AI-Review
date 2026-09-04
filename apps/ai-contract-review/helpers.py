@@ -20,7 +20,9 @@ class ExtractContractArtifactOutput:
 
 @dataclass
 class PDFSummaryInput:
-    s3_path:str
+    s3_path: str
+    document_task_queue: str = ""
+    llm_task_queue: str = ""
 
 @dataclass(frozen=True)
 class PDFSummaryOutput:
@@ -33,8 +35,10 @@ class PDFSummaryOutput:
 
 @dataclass
 class ContractReviewInput:
-    s3_paths: list
+    s3_paths: list[str]
     max_revisions: int = 2
+    document_task_queue: str = ""
+    llm_task_queue: str = ""
 
 @dataclass(frozen=True)
 class ArtifactReference:

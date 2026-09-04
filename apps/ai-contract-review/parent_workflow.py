@@ -8,7 +8,6 @@ from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
-    from activities import revise_contract_report, synthesize_contract_report
     from child_workflow import PDFSummaryWorkflow
     from helpers import (
         ContractReport,
@@ -160,7 +159,11 @@ class ContractReviewWorkflow:
             *[
                 workflow.start_child_workflow(
                     PDFSummaryWorkflow.run,
-                    PDFSummaryInput(s3_path=s3_path),
+                    PDFSummaryInput(
+                        s3_path=s3_path,
+                        document_task_queue=params.document_task_queue,
+                        llm_task_queue=params.llm_task_queue,
+                    ),
                     id=f"{workflow_id}-pdf-{index + 1}",
                     task_queue=task_queue,
                     parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
@@ -248,11 +251,13 @@ class ContractReviewWorkflow:
                     non_retryable=True,
                 )
             self._report = await workflow.execute_activity(
-                revise_contract_report,
+                "revise_contract_report",
                 ReviseReportInput(
                     report=self._report,
                     feedback=command.feedback,
                 ),
+                result_type=ContractReport,
+                task_queue=params.llm_task_queue or workflow.info().task_queue,
                 start_to_close_timeout=timedelta(minutes=5),
                 heartbeat_timeout=timedelta(seconds=180),
                 retry_policy=DEFAULT_RETRY_POLICY,
@@ -270,11 +275,13 @@ class ContractReviewWorkflow:
 
             self._phase = "analyzing"
             self._report = await workflow.execute_activity(
-                synthesize_contract_report,
+                "synthesize_contract_report",
                 SynthesizeReportInput(
                     documents=self._documents,
                     completeness=self._completeness,
                 ),
+                result_type=ContractReport,
+                task_queue=params.llm_task_queue or workflow.info().task_queue,
                 start_to_close_timeout=timedelta(minutes=5),
                 heartbeat_timeout=timedelta(seconds=180),
                 retry_policy=DEFAULT_RETRY_POLICY,
