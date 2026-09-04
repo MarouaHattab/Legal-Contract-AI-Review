@@ -4,6 +4,8 @@ from config import get_streamlit_settings
 from styles import apply_global_styles
 from ui_state import initialize_session_state
 from views.home import render_home
+from views.start_contract import render_start_contract
+from views.start_pdf import render_start_pdf
 
 settings = get_streamlit_settings()
 st.set_page_config(
@@ -16,17 +18,16 @@ st.set_page_config(
 initialize_session_state(st.session_state)
 apply_global_styles()
 
-current_page = st.navigation(
-    [
-        st.Page(
-            render_home,
-            title="Dashboard",
-            icon=":material/dashboard:",
-            default=True,
-        )
-    ],
-    position="sidebar",
-    expanded=True,
-)
+pages = {
+    "Dashboard": render_home,
+    "Start PDF Workflow": render_start_pdf,
+    "Start Contract Review": render_start_contract,
+}
+with st.sidebar:
+    current_page = st.radio(
+        "Navigate",
+        list(pages),
+        key="active_page",
+    )
 render_sidebar_context()
-current_page.run()
+pages[current_page]()

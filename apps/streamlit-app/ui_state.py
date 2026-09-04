@@ -4,6 +4,7 @@ from typing import Literal
 WorkflowTypeValue = Literal["pdf", "contract_review"]
 
 SESSION_DEFAULTS: dict[str, object] = {
+    "active_page": "Dashboard",
     "selected_workflow_id": "",
     "selected_workflow_type": None,
     "last_started_workflow_id": "",
