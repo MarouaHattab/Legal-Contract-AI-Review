@@ -8,7 +8,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
-    from child_workflow import PDFSummaryWorkflow
+    from child_workflow import LLM_RETRY_POLICY, PDFSummaryWorkflow
     from helpers import (
         ContractReport,
         ContractReviewInput,
@@ -43,6 +43,16 @@ class ContractReviewWorkflow:
         self._current_revision = 0
         self._pending_review: ReviewCommand | None = None
         self._completeness = "pending"
+        self._use_phase_2_activity_options = False
+
+    def _llm_activity_options(self, activity_id: str) -> dict:
+        if not self._use_phase_2_activity_options:
+            return {"retry_policy": DEFAULT_RETRY_POLICY}
+        return {
+            "retry_policy": LLM_RETRY_POLICY,
+            "schedule_to_close_timeout": timedelta(minutes=15),
+            "activity_id": activity_id,
+        }
 
     @workflow.query
     def get_status(self) -> dict:
@@ -260,13 +270,18 @@ class ContractReviewWorkflow:
                 task_queue=params.llm_task_queue or workflow.info().task_queue,
                 start_to_close_timeout=timedelta(minutes=5),
                 heartbeat_timeout=timedelta(seconds=180),
-                retry_policy=DEFAULT_RETRY_POLICY,
+                **self._llm_activity_options(
+                    f"revise-report-{self._current_revision + 1}"
+                ),
             )
             self._current_revision += 1
 
     @workflow.run
     async def run(self, params: ContractReviewInput) -> ContractReviewResult:
         try:
+            self._use_phase_2_activity_options = workflow.patched(
+                "contract-phase-2-activity-options"
+            )
             self._validate_input(params)
             await self._process_documents(params)
             if self._completeness == "failed":
@@ -284,7 +299,7 @@ class ContractReviewWorkflow:
                 task_queue=params.llm_task_queue or workflow.info().task_queue,
                 start_to_close_timeout=timedelta(minutes=5),
                 heartbeat_timeout=timedelta(seconds=180),
-                retry_policy=DEFAULT_RETRY_POLICY,
+                **self._llm_activity_options("synthesize-report"),
             )
             return await self._await_human_review(params)
         except asyncio.CancelledError:
