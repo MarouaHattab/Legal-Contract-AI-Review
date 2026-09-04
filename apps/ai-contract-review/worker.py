@@ -8,28 +8,23 @@ from activities import (
     synthesize_contract_report,
 )
 from child_workflow import PDFSummaryWorkflow
-from dotenv import load_dotenv
 from parent_workflow import ContractReviewWorkflow
+from settings import get_contract_settings
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-load_dotenv()
-from helpers import (
-    TEMPORAL_HOST,
-    TEMPORAL_NAMESPACE,
-    TEMPORAL_TASK_QUEUE,
-)
-
 
 async def main():
-
-    temporal_client = await Client.connect(TEMPORAL_HOST, 
-                                           namespace=TEMPORAL_NAMESPACE)
+    settings = get_contract_settings()
+    temporal_client = await Client.connect(
+        settings.temporal_host,
+        namespace=settings.temporal_namespace,
+    )
     
     with ThreadPoolExecutor(max_workers=8) as activity_executor:
         worker = Worker(
             temporal_client,
-            task_queue=TEMPORAL_TASK_QUEUE,
+            task_queue=settings.orchestration_task_queue,
             workflows=[ContractReviewWorkflow, PDFSummaryWorkflow],
             activities=[
                 extract_contract_artifact,
@@ -40,7 +35,7 @@ async def main():
             activity_executor=activity_executor,
         )
 
-        print(f"Worker running on: '{TEMPORAL_TASK_QUEUE}'")
+        print(f"Worker running on: '{settings.orchestration_task_queue}'")
         await worker.run()
 
 

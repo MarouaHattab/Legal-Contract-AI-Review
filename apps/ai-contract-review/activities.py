@@ -1,7 +1,6 @@
 import hashlib
 import json
 import math
-import os
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -10,9 +9,6 @@ import fitz
 import json_repair
 import pymupdf4llm
 from helpers import (
-    API_KEY,
-    BASE_URL,
-    MODEL,
     AnalyzeContractInput,
     ArtifactReference,
     ContractReport,
@@ -32,6 +28,7 @@ from prompts import (
     _REVISION_PROMPT,
     _SYNTHESIS_PROMPT,
 )
+from settings import get_contract_settings
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
@@ -121,9 +118,13 @@ def parse_contract_report(content: str) -> ContractReport:
 
 
 def _call_llm_content(prompt: str) -> str:
-    llm_client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+    settings = get_contract_settings()
+    llm_client = OpenAI(
+        api_key=settings.openrouter_api_key.get_secret_value(),
+        base_url=settings.llm_base_url,
+    )
     response = llm_client.chat.completions.create(
-        model=MODEL,
+        model=settings.llm_model,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=8000,
     )
@@ -235,7 +236,7 @@ def extract_contract_artifact(
             non_retryable=True,
         ) from exc
 
-    temp_root = Path(os.environ["TEMP_DIR"])
+    temp_root = get_contract_settings().temp_dir
     temp_root.mkdir(parents=True, exist_ok=True)
     s3_client = get_s3_client()
 

@@ -1,22 +1,10 @@
-import os
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
 import boto3
-from dotenv import load_dotenv
+from settings import ContractSettings, get_contract_settings
 
-load_dotenv()
-
-
-API_KEY=os.environ["OPENROUTER_API_KEY"]
-BASE_URL=os.environ["BASE_URL"]
-MODEL=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
-
-
-TEMPORAL_HOST       = os.environ["TEMPORAL_HOST"]
-TEMPORAL_NAMESPACE  = os.environ["TEMPORAL_NAMESPACE"]
-TEMPORAL_TASK_QUEUE = os.environ["TEMPORAL_TASK_QUEUE"]
 
 # Dataclasses 
 @dataclass
@@ -115,13 +103,14 @@ class ContractReviewResult:
     revision_count: int
 #  S3 helper 
 
-def get_s3_client():
+def get_s3_client(settings: ContractSettings | None = None):
+    settings = settings or get_contract_settings()
     return boto3.client(
         "s3",
-        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-        region_name=os.environ["AWS_REGION"],
-        endpoint_url=os.environ["AWS_S3_ENDPOINT_URL"],
+        aws_access_key_id=settings.aws_access_key_id.get_secret_value(),
+        aws_secret_access_key=settings.aws_secret_access_key.get_secret_value(),
+        region_name=settings.aws_region,
+        endpoint_url=settings.s3_endpoint_url,
     )
 
 def parse_s3_path(s3_path: str) -> tuple[str, str]:
