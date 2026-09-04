@@ -68,7 +68,7 @@ def _render_live_status(workflow_id: str, workflow_type: str) -> None:
             key=f"open_result_{workflow_key}",
             icon=":material/description:",
         ):
-            st.session_state["active_page"] = "Results"
+            st.session_state["active_page"] = "Results / Previous Runs"
             st.rerun()
 
         if st.button(

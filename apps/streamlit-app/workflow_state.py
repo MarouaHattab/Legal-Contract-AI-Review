@@ -86,3 +86,9 @@ def terminal_presentation(
             "The backend returned an unrecognized terminal state.",
         ),
     )
+
+
+def history_destination(execution_status: str) -> str:
+    if execution_status.upper() == "RUNNING":
+        return "Workflow Status"
+    return "Results / Previous Runs"

@@ -236,7 +236,7 @@ def render_human_review() -> None:
             icon=":material/flag:",
         )
         if st.button("Open result", icon=":material/description:"):
-            st.session_state["active_page"] = "Results"
+            st.session_state["active_page"] = "Results / Previous Runs"
             st.rerun()
         return
     if status.phase != "awaiting_review":

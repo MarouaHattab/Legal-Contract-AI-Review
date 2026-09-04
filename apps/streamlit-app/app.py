@@ -27,8 +27,12 @@ pages = {
     "Start Contract Review": render_start_contract,
     "Workflow Status": render_workflow_status,
     "Human Review": render_human_review,
-    "Results": render_results,
+    "Results / Previous Runs": render_results,
 }
+if st.session_state["active_page"] == "Results":
+    st.session_state["active_page"] = "Results / Previous Runs"
+elif st.session_state["active_page"] not in pages:
+    st.session_state["active_page"] = "Dashboard"
 with st.sidebar:
     current_page = st.radio(
         "Navigate",
