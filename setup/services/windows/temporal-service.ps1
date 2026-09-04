@@ -1,46 +1,67 @@
+[CmdletBinding()]
+param(
+    [string]$DockerPath = ""
+)
+
 $ErrorActionPreference = "Stop"
 
-$Docker = "C:\Users\MSI\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe"
+$repositoryRoot = (Resolve-Path -LiteralPath (
+    Join-Path $PSScriptRoot "..\..\.."
+)).Path
+$composeDirectory = Join-Path $repositoryRoot "setup\samples-server\compose"
+$composeFile = Join-Path $composeDirectory "docker-compose-postgres.yml"
 
-$ComposeDir = "C:\Users\MSI\Desktop\temporal-101-course\setup\samples-server\compose"
+if ($DockerPath) {
+    if (-not (Test-Path -LiteralPath $DockerPath -PathType Leaf)) {
+        throw "Docker executable not found: $DockerPath"
+    }
+    $docker = (Resolve-Path -LiteralPath $DockerPath).Path
+}
+else {
+    $dockerCommand = Get-Command docker -CommandType Application -ErrorAction SilentlyContinue
+    if (-not $dockerCommand) {
+        throw "Docker CLI was not found on PATH. Pass -DockerPath with its full path."
+    }
+    $docker = $dockerCommand.Source
+}
 
-$ComposeFile = Join-Path $ComposeDir "docker-compose-postgres.yml"
+if (-not (Test-Path -LiteralPath $composeFile -PathType Leaf)) {
+    throw "Temporal Compose file not found: $composeFile"
+}
 
-Write-Host "Waiting for Docker Desktop..."
-
+Write-Host "Waiting for Docker..."
 $maxAttempts = 60
 
-for ($i = 1; $i -le $maxAttempts; $i++) {
-
-    try {
-        & $Docker info *> $null
-
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "Docker is ready."
-            break
-        }
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    & $docker info *> $null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Docker is ready."
+        break
     }
-    catch {}
 
-    if ($i -eq $maxAttempts) {
+    if ($attempt -eq $maxAttempts) {
         throw "Docker did not become ready."
     }
 
     Start-Sleep -Seconds 5
 }
 
-Set-Location $ComposeDir
+Push-Location -LiteralPath $composeDirectory
+try {
+    Write-Host "Starting Temporal Docker Compose stack..."
+    & $docker compose -f $composeFile up -d
 
-Write-Host "Starting Temporal Docker Compose stack..."
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to start Temporal stack."
+    }
 
-& $Docker compose `
-    -f $ComposeFile `
-    up -d
+    Write-Host "Temporal stack started."
+    & $docker compose -f $composeFile ps
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to start Temporal stack."
+    if ($LASTEXITCODE -ne 0) {
+        throw "Temporal stack started, but its status could not be read."
+    }
 }
-
-Write-Host "Temporal stack started."
-
-& $Docker compose -f $ComposeFile ps
+finally {
+    Pop-Location
+}
