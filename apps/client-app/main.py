@@ -1,4 +1,3 @@
-import os
 import uuid
 
 from api_models import (
@@ -16,20 +15,13 @@ from api_models import (
     StartReviewRequest,
     WorkflowStartResponse,
 )
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from settings import get_api_settings
 from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.client import WorkflowExecutionStatus as WES
 from temporalio.service import RPCError, RPCStatusCode
 
-load_dotenv()
-
-TEMPORAL_HOST = os.environ["TEMPORAL_HOST"]
-TEMPORAL_NAMESPACE = os.environ["TEMPORAL_NAMESPACE"]
-TEMPORAL_PDF_PROCESS_TASK_QUEUE = os.environ["TEMPORAL_PDF_PROCESS_TASK_QUEUE"]
-TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE = os.environ[
-    "TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE"
-]
+settings = get_api_settings()
 
 
 app = FastAPI(
@@ -40,7 +32,10 @@ app = FastAPI(
 
 
 async def get_temporal_client() -> Client:
-    return await Client.connect(TEMPORAL_HOST, namespace=TEMPORAL_NAMESPACE)
+    return await Client.connect(
+        settings.temporal_host,
+        namespace=settings.temporal_namespace,
+    )
 
 
 def _service_error(exc: Exception) -> HTTPException:
@@ -86,9 +81,14 @@ async def execute_pdf(request: PDFProcessRequest):
         client = await get_temporal_client()
         result = await client.execute_workflow(
             "PDFPipelineWorkflow",
-            args=[{"s3_path": request.s3_path}],
+            args=[
+                {
+                    "s3_path": request.s3_path,
+                    "document_task_queue": settings.pdf_document_task_queue,
+                }
+            ],
             id=workflow_id,
-            task_queue=TEMPORAL_PDF_PROCESS_TASK_QUEUE,
+            task_queue=settings.pdf_orchestration_task_queue,
             result_type=dict,
         )
     except Exception as exc:
@@ -106,9 +106,14 @@ async def start_pdf(request: PDFProcessRequest):
         client = await get_temporal_client()
         await client.start_workflow(
             "PDFPipelineWorkflow",
-            args=[{"s3_path": request.s3_path}],
+            args=[
+                {
+                    "s3_path": request.s3_path,
+                    "document_task_queue": settings.pdf_document_task_queue,
+                }
+            ],
             id=workflow_id,
-            task_queue=TEMPORAL_PDF_PROCESS_TASK_QUEUE,
+            task_queue=settings.pdf_orchestration_task_queue,
             result_type=dict,
         )
     except Exception as exc:
@@ -183,10 +188,12 @@ async def start_contract_review(request: StartReviewRequest):
                 {
                     "s3_paths": request.s3_paths,
                     "max_revisions": request.max_revisions,
+                    "document_task_queue": settings.contract_document_task_queue,
+                    "llm_task_queue": settings.contract_llm_task_queue,
                 }
             ],
             id=workflow_id,
-            task_queue=TEMPORAL_CONTRACT_REVIEW_TASK_QUEUE,
+            task_queue=settings.contract_orchestration_task_queue,
         )
     except Exception as exc:
         raise _service_error(exc) from exc
