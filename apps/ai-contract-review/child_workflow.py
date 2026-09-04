@@ -1,13 +1,15 @@
-from dataclasses import dataclass
 from datetime import timedelta
+
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+
 with workflow.unsafe.imports_passed_through():
-    from helpers import PDFSummaryInput, PDFSummaryOutput
     from activities import analyze_contract_artifact, extract_contract_artifact
     from helpers import (
         AnalyzeContractInput,
         ExtractPDFInput,
+        PDFSummaryInput,
+        PDFSummaryOutput,
     )
 
 DEFAULT_RETRY_POLICY = RetryPolicy(

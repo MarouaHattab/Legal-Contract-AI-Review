@@ -1,7 +1,6 @@
 import asyncio
 from dataclasses import asdict
 from datetime import timedelta
-from typing import Optional
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
@@ -18,8 +17,8 @@ with workflow.unsafe.imports_passed_through():
         DocumentAnalysis,
         DocumentOutcome,
         PDFSummaryInput,
-        ReviseReportInput,
         ReviewCommand,
+        ReviseReportInput,
         SynthesizeReportInput,
     )
 
@@ -40,10 +39,10 @@ class ContractReviewWorkflow:
     def __init__(self) -> None:
         self._phase = "processing"
         self._documents: list[DocumentOutcome] = []
-        self._report: Optional[ContractReport] = None
+        self._report: ContractReport | None = None
         self._reviewer = ""
         self._current_revision = 0
-        self._pending_review: Optional[ReviewCommand] = None
+        self._pending_review: ReviewCommand | None = None
         self._completeness = "pending"
 
     @workflow.query

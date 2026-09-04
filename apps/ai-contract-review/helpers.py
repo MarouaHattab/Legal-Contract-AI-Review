@@ -1,11 +1,10 @@
 import os
-import boto3
 from dataclasses import dataclass
-from dotenv import load_dotenv
 from pathlib import PurePosixPath
-from typing import Optional
 from urllib.parse import urlsplit
 
+import boto3
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -76,7 +75,7 @@ class AnalyzeContractInput:
 class DocumentOutcome:
     s3_path: str
     status: str
-    analysis: Optional[DocumentAnalysis] = None
+    analysis: DocumentAnalysis | None = None
     error: str = ""
 
 
@@ -110,7 +109,7 @@ class ReviseReportInput:
 class ContractReviewResult:
     final_status: str
     completeness: str
-    report: Optional[ContractReport]
+    report: ContractReport | None
     documents: list[DocumentOutcome]
     reviewer: str
     revision_count: int

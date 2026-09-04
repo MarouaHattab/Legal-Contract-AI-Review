@@ -1,19 +1,18 @@
-import os
 import hashlib
 import json
 import math
+import os
 import tempfile
-from pathlib import Path
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
-import fitz                 
+import fitz
 import json_repair
 import pymupdf4llm
-from openai import OpenAI
-from temporalio import activity
-from temporalio.exceptions import ApplicationError
-
 from helpers import (
+    API_KEY,
+    BASE_URL,
+    MODEL,
     AnalyzeContractInput,
     ArtifactReference,
     ContractReport,
@@ -22,20 +21,19 @@ from helpers import (
     ExtractPDFInput,
     ReviseReportInput,
     SynthesizeReportInput,
-    get_s3_client,
     derive_contract_artifact_key,
+    get_s3_client,
     parse_s3_path,
-    BASE_URL,
-    API_KEY,
-    MODEL,
 )
+from openai import OpenAI
 from prompts import (
     _CHUNK_ANALYSIS_PROMPT,
     _DOCUMENT_AGGREGATION_PROMPT,
     _REVISION_PROMPT,
     _SYNTHESIS_PROMPT,
 )
-
+from temporalio import activity
+from temporalio.exceptions import ApplicationError
 
 MAX_CHUNK_CHARACTERS = 12_000
 AGGREGATION_BATCH_SIZE = 8

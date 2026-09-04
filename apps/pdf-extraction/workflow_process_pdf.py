@@ -1,9 +1,8 @@
-from datetime import timedelta
 from dataclasses import dataclass
+from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-
 
 with workflow.unsafe.imports_passed_through():
     from activities import convert_pdf_to_markdown

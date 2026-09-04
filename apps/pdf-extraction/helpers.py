@@ -1,9 +1,10 @@
-from dataclasses import dataclass
-from dotenv import load_dotenv
-import boto3
 import os
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit
+
+import boto3
+from dotenv import load_dotenv
 
 load_dotenv()
 

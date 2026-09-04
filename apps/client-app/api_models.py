@@ -1,9 +1,8 @@
 from pathlib import PurePosixPath
-from typing import Literal, Optional
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
 
 # Phase 1 guardrails: keep one API request well below Temporal's pending-child
 # limits and bound accidental LLM fan-out/cost for this educational deployment.
@@ -105,7 +104,7 @@ class PDFWorkflowResultResponse(APIModel):
     workflow_id: str
     execution_status: str
     final_status: Literal["completed", "failed", "cancelled", "timed_out"]
-    result: Optional[PDFArtifactResult] = None
+    result: PDFArtifactResult | None = None
     error: str = ""
 
 
@@ -127,7 +126,7 @@ class DocumentAnalysisResponse(APIModel):
 class DocumentOutcomeResponse(APIModel):
     s3_path: str
     status: Literal["succeeded", "failed"]
-    analysis: Optional[DocumentAnalysisResponse] = None
+    analysis: DocumentAnalysisResponse | None = None
     error: str = ""
 
 
@@ -141,9 +140,9 @@ class ContractDocumentProgressResponse(APIModel):
     s3_path: str
     status: Literal["succeeded", "failed"]
     error: str = ""
-    chunks_processed: Optional[int] = None
-    characters_processed: Optional[int] = None
-    artifact_s3_path: Optional[str] = None
+    chunks_processed: int | None = None
+    characters_processed: int | None = None
+    artifact_s3_path: str | None = None
 
 
 class ContractWorkflowStatusResponse(APIModel):
@@ -164,7 +163,7 @@ class ContractReportQueryResponse(APIModel):
     current_revision: int
     reviewer: str
     completeness: str
-    report: Optional[ContractReportResponse]
+    report: ContractReportResponse | None
     documents: list[DocumentOutcomeResponse]
 
 
@@ -179,7 +178,7 @@ class ContractReviewResultResponse(APIModel):
         "failed",
     ]
     completeness: str
-    report: Optional[ContractReportResponse]
+    report: ContractReportResponse | None
     documents: list[DocumentOutcomeResponse]
     reviewer: str
     revision_count: int

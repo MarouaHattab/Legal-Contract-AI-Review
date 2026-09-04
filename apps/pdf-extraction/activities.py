@@ -4,18 +4,17 @@ import tempfile
 from pathlib import Path
 
 import pymupdf4llm
-from temporalio import activity
-from temporalio.exceptions import ApplicationError
-
 from helpers import (
+    TEMP_DIR,
     ArtifactReference,
     ConvertPDFInput,
     ConvertPDFOutput,
-    TEMP_DIR,
     derive_markdown_key,
     get_s3_client,
     parse_s3_path,
 )
+from temporalio import activity
+from temporalio.exceptions import ApplicationError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)

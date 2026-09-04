@@ -1,13 +1,6 @@
 import os
 import uuid
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from temporalio.client import Client
-from temporalio.client import WorkflowExecutionStatus as WES
-from temporalio.client import WorkflowUpdateFailedError
-from temporalio.service import RPCError, RPCStatusCode
-
 from api_models import (
     AssignRequest,
     ContractReportQueryResponse,
@@ -23,7 +16,11 @@ from api_models import (
     StartReviewRequest,
     WorkflowStartResponse,
 )
-
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from temporalio.client import Client, WorkflowUpdateFailedError
+from temporalio.client import WorkflowExecutionStatus as WES
+from temporalio.service import RPCError, RPCStatusCode
 
 load_dotenv()
 

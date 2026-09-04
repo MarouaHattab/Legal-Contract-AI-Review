@@ -1,11 +1,5 @@
 import asyncio
-import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
-
-from dotenv import load_dotenv
-from temporalio.client import Client
-from temporalio.worker import Worker
 
 from activities import (
     analyze_contract_artifact,
@@ -14,7 +8,10 @@ from activities import (
     synthesize_contract_report,
 )
 from child_workflow import PDFSummaryWorkflow
+from dotenv import load_dotenv
 from parent_workflow import ContractReviewWorkflow
+from temporalio.client import Client
+from temporalio.worker import Worker
 
 load_dotenv()
 from helpers import (
@@ -22,6 +19,7 @@ from helpers import (
     TEMPORAL_NAMESPACE,
     TEMPORAL_TASK_QUEUE,
 )
+
 
 async def main():
 

@@ -1,14 +1,12 @@
 import asyncio
-import logging
-import os 
+import os
 from concurrent.futures import ThreadPoolExecutor
 
+from activities import convert_pdf_to_markdown
 from dotenv import load_dotenv
 from temporalio.client import Client
 from temporalio.worker import Worker
-
 from workflow_process_pdf import PDFPipelineWorkflow
-from activities import convert_pdf_to_markdown
 
 load_dotenv()
 
