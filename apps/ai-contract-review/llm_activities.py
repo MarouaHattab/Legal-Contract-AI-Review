@@ -112,6 +112,8 @@ def _call_llm_content(prompt: str) -> str:
     llm_client = OpenAI(
         api_key=settings.openrouter_api_key.get_secret_value(),
         base_url=settings.llm_base_url,
+        timeout=settings.llm_request_timeout_seconds,
+        max_retries=0,
     )
     response = llm_client.chat.completions.create(
         model=settings.llm_model,

@@ -3,6 +3,7 @@ from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
 import boto3
+from botocore.config import Config
 from settings import ContractSettings, get_contract_settings
 
 
@@ -115,6 +116,11 @@ def get_s3_client(settings: ContractSettings | None = None):
         aws_secret_access_key=settings.aws_secret_access_key.get_secret_value(),
         region_name=settings.aws_region,
         endpoint_url=settings.s3_endpoint_url,
+        config=Config(
+            connect_timeout=settings.s3_connect_timeout_seconds,
+            read_timeout=settings.s3_read_timeout_seconds,
+            retries={"total_max_attempts": 1, "mode": "standard"},
+        ),
     )
 
 def parse_s3_path(s3_path: str) -> tuple[str, str]:

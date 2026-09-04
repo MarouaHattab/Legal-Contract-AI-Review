@@ -3,6 +3,7 @@ from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
 import boto3
+from botocore.config import Config
 from settings import PDFSettings, get_pdf_settings
 
 # ── Input / Output dataclasses ────────────────────────────────────────────────
@@ -36,6 +37,11 @@ def get_s3_client(settings: PDFSettings | None = None):
         aws_access_key_id=settings.aws_access_key_id.get_secret_value(),
         aws_secret_access_key=settings.aws_secret_access_key.get_secret_value(),
         endpoint_url=settings.s3_endpoint_url,
+        config=Config(
+            connect_timeout=settings.s3_connect_timeout_seconds,
+            read_timeout=settings.s3_read_timeout_seconds,
+            retries={"total_max_attempts": 1, "mode": "standard"},
+        ),
     )
 
 def parse_s3_path(s3_path: str) -> tuple[str, str]:
