@@ -50,6 +50,19 @@ def _render_live_status(workflow_id: str, workflow_type: str) -> None:
                 "while this workflow is active."
             )
 
+        if (
+            workflow_type == "contract_review"
+            and status.phase == "awaiting_review"
+            and st.button(
+                "Open human review",
+                key=f"open_review_{workflow_key}",
+                type="primary",
+                icon=":material/rate_review:",
+            )
+        ):
+            st.session_state["active_page"] = "Human Review"
+            st.rerun()
+
         if st.button(
             "Refresh now",
             key=f"refresh_status_{workflow_key}",

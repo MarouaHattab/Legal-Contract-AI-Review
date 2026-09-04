@@ -13,6 +13,7 @@ SESSION_DEFAULTS: dict[str, object] = {
     "last_review_submission": "",
     "polling_stopped_for": "",
     "flash_message": "",
+    "review_notice": None,
 }
 
 
@@ -33,6 +34,7 @@ def select_workflow(
     state["latest_known_revision"] = None
     state["last_review_submission"] = ""
     state["polling_stopped_for"] = ""
+    state["review_notice"] = None
 
 
 def remember_started_workflow(

@@ -4,6 +4,7 @@ from config import get_streamlit_settings
 from styles import apply_global_styles
 from ui_state import initialize_session_state
 from views.home import render_home
+from views.human_review import render_human_review
 from views.start_contract import render_start_contract
 from views.start_pdf import render_start_pdf
 from views.workflow_status import render_workflow_status
@@ -24,6 +25,7 @@ pages = {
     "Start PDF Workflow": render_start_pdf,
     "Start Contract Review": render_start_contract,
     "Workflow Status": render_workflow_status,
+    "Human Review": render_human_review,
 }
 with st.sidebar:
     current_page = st.radio(
