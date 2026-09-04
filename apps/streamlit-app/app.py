@@ -6,6 +6,7 @@ from ui_state import initialize_session_state
 from views.home import render_home
 from views.start_contract import render_start_contract
 from views.start_pdf import render_start_pdf
+from views.workflow_status import render_workflow_status
 
 settings = get_streamlit_settings()
 st.set_page_config(
@@ -22,6 +23,7 @@ pages = {
     "Dashboard": render_home,
     "Start PDF Workflow": render_start_pdf,
     "Start Contract Review": render_start_contract,
+    "Workflow Status": render_workflow_status,
 }
 with st.sidebar:
     current_page = st.radio(

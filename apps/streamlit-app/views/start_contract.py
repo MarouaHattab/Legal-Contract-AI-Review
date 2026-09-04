@@ -73,10 +73,11 @@ def render_start_contract() -> None:
                     workflow_type="contract_review",
                     submission_fingerprint=fingerprint,
                 )
-                st.success(
-                    "Contract review started. Open Workflow Status to follow it.",
-                    icon=":material/check_circle:",
+                st.session_state["flash_message"] = (
+                    "Contract review started. Its live status is shown below."
                 )
+                st.session_state["active_page"] = "Workflow Status"
+                st.rerun()
 
     last_started = st.session_state.get("last_started_workflow_id", "")
     if last_started:

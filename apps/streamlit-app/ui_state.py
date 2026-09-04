@@ -11,6 +11,8 @@ SESSION_DEFAULTS: dict[str, object] = {
     "last_submission_fingerprint": "",
     "latest_known_revision": None,
     "last_review_submission": "",
+    "polling_stopped_for": "",
+    "flash_message": "",
 }
 
 
@@ -30,6 +32,7 @@ def select_workflow(
     state["selected_workflow_type"] = workflow_type
     state["latest_known_revision"] = None
     state["last_review_submission"] = ""
+    state["polling_stopped_for"] = ""
 
 
 def remember_started_workflow(

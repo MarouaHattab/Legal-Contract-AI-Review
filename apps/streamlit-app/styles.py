@@ -34,6 +34,31 @@ p, label, [data-testid="stCaptionContainer"] { color: var(--ui-muted); }
   text-transform: uppercase;
 }
 .ui-rule { border-top: 1px solid var(--ui-line); margin: 1.5rem 0; }
+.ui-phase-panel {
+  background: #FFFFFF;
+  border-left: 4px solid var(--ui-blue);
+  border-top: 1px solid var(--ui-line);
+  border-bottom: 1px solid var(--ui-line);
+  padding: 1.35rem 1.5rem 1.2rem;
+  margin-bottom: 1rem;
+}
+.ui-phase-label {
+  color: var(--ui-blue);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.ui-phase-word {
+  color: var(--ui-ink);
+  font-size: clamp(2.1rem, 5vw, 4.5rem);
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+  margin: 0.55rem 0 0.75rem;
+}
+.ui-phase-note { margin: 0; }
 .stButton > button, .stFormSubmitButton > button {
   border-radius: 0;
   font-weight: 600;

@@ -63,10 +63,11 @@ def render_start_pdf() -> None:
                     workflow_type="pdf",
                     submission_fingerprint=fingerprint,
                 )
-                st.success(
-                    "PDF workflow started. Open Workflow Status to follow it.",
-                    icon=":material/check_circle:",
+                st.session_state["flash_message"] = (
+                    "PDF workflow started. Its live status is shown below."
                 )
+                st.session_state["active_page"] = "Workflow Status"
+                st.rerun()
 
     last_started = st.session_state.get("last_started_workflow_id", "")
     if last_started:
