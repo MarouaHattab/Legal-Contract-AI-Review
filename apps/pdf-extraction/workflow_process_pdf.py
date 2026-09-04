@@ -5,12 +5,12 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from activities import convert_pdf_to_markdown
-    from helpers import ConvertPDFInput
+    from helpers import ConvertPDFInput, ConvertPDFOutput
 
 @dataclass
 class PDFPipelineInput:
     s3_path: str # exmple : "s3://bucket/reports/annual-report.pdf"
+    document_task_queue: str = ""
 @dataclass
 class PDFPipelineOutput:
     output_s3_path: str
@@ -48,8 +48,10 @@ class PDFPipelineWorkflow:
         workflow.logger.info(f"Starting PDF Pipeline for {params.s3_path}")
         self._phase = "processing"
         converted = await workflow.execute_activity(
-            convert_pdf_to_markdown,
+            "convert_pdf_to_markdown",
             ConvertPDFInput(s3_path=params.s3_path),
+            result_type=ConvertPDFOutput,
+            task_queue=params.document_task_queue or workflow.info().task_queue,
             retry_policy=DEFAULT_RETRY,
             start_to_close_timeout=timedelta(minutes=15),
         )
