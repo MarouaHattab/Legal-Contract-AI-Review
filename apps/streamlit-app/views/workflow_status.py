@@ -63,6 +63,14 @@ def _render_live_status(workflow_id: str, workflow_type: str) -> None:
             st.session_state["active_page"] = "Human Review"
             st.rerun()
 
+        if status.result_available and st.button(
+            "Open result",
+            key=f"open_result_{workflow_key}",
+            icon=":material/description:",
+        ):
+            st.session_state["active_page"] = "Results"
+            st.rerun()
+
         if st.button(
             "Refresh now",
             key=f"refresh_status_{workflow_key}",

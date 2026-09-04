@@ -235,6 +235,9 @@ def render_human_review() -> None:
             "This workflow is terminal. Open Results / Previous Runs for its outcome.",
             icon=":material/flag:",
         )
+        if st.button("Open result", icon=":material/description:"):
+            st.session_state["active_page"] = "Results"
+            st.rerun()
         return
     if status.phase != "awaiting_review":
         st.info(
