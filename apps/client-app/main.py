@@ -1,4 +1,6 @@
 import uuid
+from contextlib import asynccontextmanager
+from datetime import timedelta
 
 from api_models import (
     AssignRequest,
@@ -24,18 +26,37 @@ from temporalio.service import RPCError, RPCStatusCode
 settings = get_api_settings()
 
 
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    application.state.temporal_client = await Client.connect(
+        settings.temporal_host,
+        namespace=settings.temporal_namespace,
+        lazy=True,
+    )
+    try:
+        yield
+    finally:
+        application.state.temporal_client = None
+
+
 app = FastAPI(
     title="Temporal Document Processing API",
     description="Starts and reviews durable PDF and contract workflows.",
     version="1.1.0",
+    lifespan=lifespan,
 )
 
 
 async def get_temporal_client() -> Client:
-    return await Client.connect(
-        settings.temporal_host,
-        namespace=settings.temporal_namespace,
-    )
+    client = getattr(app.state, "temporal_client", None)
+    if client is None:
+        client = await Client.connect(
+            settings.temporal_host,
+            namespace=settings.temporal_namespace,
+            lazy=True,
+        )
+        app.state.temporal_client = client
+    return client
 
 
 def _service_error(exc: Exception) -> HTTPException:
@@ -69,6 +90,31 @@ def _terminal_status(status: WES) -> str:
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/health/live")
+async def liveness():
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+async def readiness():
+    try:
+        client = await get_temporal_client()
+        healthy = await client.service_client.check_health(
+            timeout=timedelta(seconds=settings.temporal_health_timeout_seconds)
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Temporal service is not ready.",
+        ) from exc
+    if not healthy:
+        raise HTTPException(
+            status_code=503,
+            detail="Temporal service is not ready.",
+        )
+    return {"status": "ready"}
 
 
 @app.post(
