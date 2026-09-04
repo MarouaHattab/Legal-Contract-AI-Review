@@ -34,6 +34,15 @@ DEFAULT_RETRY = RetryPolicy(
     # So: 1 initial attempt + up to 4 retries.
     maximum_attempts=5,
 )
+DOCUMENT_RETRY_POLICY = RetryPolicy(
+    initial_interval=timedelta(seconds=2),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(seconds=30),
+    maximum_attempts=3,
+    non_retryable_error_types=["InvalidPDFInput", "UnsafeOutputKey"],
+)
+
+
 @workflow.defn
 class PDFPipelineWorkflow:
     def __init__(self) -> None:
@@ -47,13 +56,22 @@ class PDFPipelineWorkflow:
     async def run(self,params: PDFPipelineInput) -> PDFPipelineOutput:
         workflow.logger.info(f"Starting PDF Pipeline for {params.s3_path}")
         self._phase = "processing"
+        activity_options = (
+            {
+                "retry_policy": DOCUMENT_RETRY_POLICY,
+                "schedule_to_close_timeout": timedelta(minutes=50),
+                "activity_id": "convert-pdf",
+            }
+            if workflow.patched("pdf-phase-2-activity-options")
+            else {"retry_policy": DEFAULT_RETRY}
+        )
         converted = await workflow.execute_activity(
             "convert_pdf_to_markdown",
             ConvertPDFInput(s3_path=params.s3_path),
             result_type=ConvertPDFOutput,
             task_queue=params.document_task_queue or workflow.info().task_queue,
-            retry_policy=DEFAULT_RETRY,
             start_to_close_timeout=timedelta(minutes=15),
+            **activity_options,
         )
 
         self._phase = "completed"
