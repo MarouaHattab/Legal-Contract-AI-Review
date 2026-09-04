@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
@@ -20,6 +21,7 @@ from api_models import (
     WorkflowSummaryResponse,
 )
 from fastapi import FastAPI, HTTPException, Query
+from pydantic import ValidationError
 from settings import get_api_settings
 from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.client import WorkflowExecutionStatus as WES
@@ -254,11 +256,20 @@ async def get_pdf_result(workflow_id: str):
         result = await handle.result()
     except Exception as exc:
         raise _service_error(exc) from exc
+    try:
+        artifact = PDFArtifactResult.model_validate(result)
+    except ValidationError:
+        return PDFWorkflowResultResponse(
+            workflow_id=workflow_id,
+            execution_status=description.status.name,
+            final_status="failed",
+            error="Workflow completed without a compatible PDF artifact.",
+        )
     return PDFWorkflowResultResponse(
         workflow_id=workflow_id,
         execution_status=description.status.name,
         final_status="completed",
-        result=PDFArtifactResult.model_validate(result),
+        result=artifact,
     )
 
 
@@ -372,10 +383,27 @@ async def get_review_result(workflow_id: str):
         result = await handle.result()
     except Exception as exc:
         raise _service_error(exc) from exc
+    if isinstance(result, Mapping):
+        try:
+            return ContractReviewResultResponse.model_validate(
+                {
+                    "workflow_id": workflow_id,
+                    "execution_status": description.status.name,
+                    **result,
+                }
+            )
+        except ValidationError:
+            pass
     return ContractReviewResultResponse(
         workflow_id=workflow_id,
         execution_status=description.status.name,
-        **result,
+        final_status="failed",
+        completeness="failed",
+        report=None,
+        documents=[],
+        reviewer="",
+        revision_count=0,
+        error="Workflow completed without a compatible contract result.",
     )
 
 
