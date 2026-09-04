@@ -31,7 +31,7 @@ def render_start_pdf() -> None:
             "Start PDF workflow",
             type="primary",
             icon=":material/play_arrow:",
-            use_container_width=True,
+            width="stretch",
         )
 
     if submitted:

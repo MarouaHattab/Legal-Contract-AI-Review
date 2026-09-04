@@ -55,7 +55,7 @@ def _render_previous_runs() -> None:
         }
         for workflow in response.workflows
     ]
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
     workflow_by_id = {workflow.workflow_id: workflow for workflow in response.workflows}
     selected_id = st.selectbox(
         "Select previous workflow",
@@ -65,7 +65,7 @@ def _render_previous_runs() -> None:
     if st.button(
         "Open selected workflow",
         icon=":material/open_in_new:",
-        use_container_width=True,
+        width="stretch",
     ):
         workflow = workflow_by_id[selected_id]
         select_workflow(

@@ -141,7 +141,7 @@ def _render_decisions(workflow_id: str, revision: int, reviewer: str) -> None:
                 type="primary",
                 icon=":material/check:",
                 disabled=not reviewer,
-                use_container_width=True,
+                width="stretch",
             )
         if approve:
             _submit_decision(
@@ -162,7 +162,7 @@ def _render_decisions(workflow_id: str, revision: int, reviewer: str) -> None:
                 "Request revision",
                 icon=":material/rate_review:",
                 disabled=not reviewer,
-                use_container_width=True,
+                width="stretch",
             )
         if revise:
             normalized_feedback = feedback.strip()

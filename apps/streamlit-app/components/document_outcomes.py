@@ -19,7 +19,7 @@ def render_document_progress(documents: list[ContractDocumentProgress]) -> None:
         }
         for document in documents
     ]
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
     failed = [document for document in documents if document.status == "failed"]
     if failed:
         st.warning(

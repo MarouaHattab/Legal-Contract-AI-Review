@@ -22,7 +22,7 @@ def render_home() -> None:
             "Turn one source PDF in S3 into a derived Markdown artifact while "
             "keeping the source object untouched."
         )
-        if st.button("Start PDF extraction", use_container_width=True):
+        if st.button("Start PDF extraction", width="stretch"):
             st.session_state["active_page"] = "Start PDF Workflow"
             st.rerun()
     with contract_column:
@@ -31,7 +31,7 @@ def render_home() -> None:
             "Analyze one or more contracts, inspect document-level outcomes, "
             "and make a revision-aware human decision."
         )
-        if st.button("Start contract review", use_container_width=True):
+        if st.button("Start contract review", width="stretch"):
             st.session_state["active_page"] = "Start Contract Review"
             st.rerun()
 

@@ -40,7 +40,7 @@ def render_start_contract() -> None:
             "Start contract review",
             type="primary",
             icon=":material/play_arrow:",
-            use_container_width=True,
+            width="stretch",
         )
 
     if submitted:
