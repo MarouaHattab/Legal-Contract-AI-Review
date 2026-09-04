@@ -1,21 +1,9 @@
-import os
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
 import boto3
-from dotenv import load_dotenv
-
-load_dotenv()
-
-AWS_ACCESS_KEY_ID = os.environ["AWS_ACCESS_KEY_ID"]
-AWS_SECRET_ACCESS_KEY = os.environ["AWS_SECRET_ACCESS_KEY"]
-AWS_REGION = os.environ["AWS_REGION"]
-AWS_S3_ENDPOINT_URL = os.environ["AWS_S3_ENDPOINT_URL"]
-S3_BUCKET = os.environ["S3_BUCKET"]
-TEMP_DIR = os.environ["TEMP_DIR"]
-
-os.makedirs(TEMP_DIR, exist_ok=True)
+from settings import PDFSettings, get_pdf_settings
 
 # ── Input / Output dataclasses ────────────────────────────────────────────────
 # Temporal serializes these to/from JSON automatically.
@@ -40,13 +28,14 @@ class ConvertPDFOutput:
 
 # ── S3 helper ────────────────────────────────────────────────────────────────
 
-def get_s3_client():
+def get_s3_client(settings: PDFSettings | None = None):
+    settings = settings or get_pdf_settings()
     return boto3.client(
         "s3",
-        region_name=AWS_REGION,
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        endpoint_url=AWS_S3_ENDPOINT_URL,
+        region_name=settings.aws_region,
+        aws_access_key_id=settings.aws_access_key_id.get_secret_value(),
+        aws_secret_access_key=settings.aws_secret_access_key.get_secret_value(),
+        endpoint_url=settings.s3_endpoint_url,
     )
 
 def parse_s3_path(s3_path: str) -> tuple[str, str]:

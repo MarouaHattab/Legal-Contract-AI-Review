@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pymupdf4llm
 from helpers import (
-    TEMP_DIR,
     ArtifactReference,
     ConvertPDFInput,
     ConvertPDFOutput,
@@ -13,6 +12,7 @@ from helpers import (
     get_s3_client,
     parse_s3_path,
 )
+from settings import get_pdf_settings
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
@@ -33,7 +33,7 @@ def convert_pdf_to_markdown(params: ConvertPDFInput) -> ConvertPDFOutput:
             non_retryable=True,
         ) from exc
 
-    temp_root = Path(TEMP_DIR)
+    temp_root = get_pdf_settings().temp_dir
     temp_root.mkdir(parents=True, exist_ok=True)
     s3_client = get_s3_client()
     activity.logger.info("Processing PDF artifact: %s", params.s3_path)

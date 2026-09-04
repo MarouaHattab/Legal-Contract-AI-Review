@@ -1,34 +1,35 @@
 import asyncio
-import os
 from concurrent.futures import ThreadPoolExecutor
 
 from activities import convert_pdf_to_markdown
-from dotenv import load_dotenv
+from settings import get_pdf_settings
 from temporalio.client import Client
 from temporalio.worker import Worker
 from workflow_process_pdf import PDFPipelineWorkflow
 
-load_dotenv()
-
-TEMPORAL_HOST = os.environ["TEMPORAL_HOST"]
-TEMPORAL_NAMESPACE = os.environ["TEMPORAL_NAMESPACE"]
-TEMPORAL_PDF_PROCESS_TASK_QUEUE = os.environ["TEMPORAL_PDF_PROCESS_TASK_QUEUE"]
-
 
 async def main():
+    settings = get_pdf_settings()
     temporal_client = await Client.connect(
-        TEMPORAL_HOST,
-        namespace=TEMPORAL_NAMESPACE
+        settings.temporal_host,
+        namespace=settings.temporal_namespace,
     )
-    with ThreadPoolExecutor(max_workers=4) as activity_executor:
+    with ThreadPoolExecutor(
+        max_workers=settings.document_worker_concurrency
+    ) as activity_executor:
         worker_pdf_process = Worker(
             temporal_client,
-            task_queue=TEMPORAL_PDF_PROCESS_TASK_QUEUE,
+            task_queue=settings.orchestration_task_queue,
             workflows=[PDFPipelineWorkflow],
             activities=[convert_pdf_to_markdown],
             activity_executor=activity_executor,
+            max_concurrent_workflow_tasks=settings.workflow_worker_concurrency,
+            max_concurrent_activities=settings.document_worker_concurrency,
         )
-        print(f"Worker for task queue '{TEMPORAL_PDF_PROCESS_TASK_QUEUE}' started. Listening for workflow tasks...")
+        print(
+            f"Worker for task queue '{settings.orchestration_task_queue}' started. "
+            "Listening for tasks..."
+        )
         await worker_pdf_process.run()
 
 
