@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Literal
 from urllib.parse import urlsplit
@@ -79,6 +80,19 @@ class ReviewDecisionRequest(APIModel):
 
 class WorkflowStartResponse(APIModel):
     workflow_id: str
+
+
+class WorkflowSummaryResponse(APIModel):
+    workflow_id: str
+    run_id: str
+    workflow_type: Literal["pdf", "contract_review"]
+    execution_status: str
+    start_time: datetime
+    close_time: datetime | None = None
+
+
+class WorkflowListResponse(APIModel):
+    workflows: list[WorkflowSummaryResponse]
 
 
 class PDFArtifactResult(APIModel):

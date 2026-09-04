@@ -15,9 +15,11 @@ from api_models import (
     ReviewActionResponse,
     ReviewDecisionRequest,
     StartReviewRequest,
+    WorkflowListResponse,
     WorkflowStartResponse,
+    WorkflowSummaryResponse,
 )
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from settings import get_api_settings
 from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.client import WorkflowExecutionStatus as WES
@@ -87,6 +89,16 @@ def _terminal_status(status: WES) -> str:
     return "failed"
 
 
+WORKFLOW_TYPE_NAMES = {
+    "PDFPipelineWorkflow": "pdf",
+    "ContractReviewWorkflow": "contract_review",
+}
+WORKFLOW_VISIBILITY_QUERY = (
+    "WorkflowType = 'PDFPipelineWorkflow' OR "
+    "WorkflowType = 'ContractReviewWorkflow'"
+)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -115,6 +127,36 @@ async def readiness():
             detail="Temporal service is not ready.",
         )
     return {"status": "ready"}
+
+
+@app.get(
+    "/workflows",
+    response_model=WorkflowListResponse,
+)
+async def list_workflows(limit: int = Query(default=50, ge=1, le=100)):
+    try:
+        client = await get_temporal_client()
+        executions = client.list_workflows(
+            query=WORKFLOW_VISIBILITY_QUERY,
+            limit=limit,
+            page_size=limit,
+        )
+        workflows = [
+            WorkflowSummaryResponse(
+                workflow_id=execution.id,
+                run_id=execution.run_id,
+                workflow_type=WORKFLOW_TYPE_NAMES[execution.workflow_type],
+                execution_status=(
+                    execution.status.name if execution.status is not None else "UNKNOWN"
+                ),
+                start_time=execution.start_time,
+                close_time=execution.close_time,
+            )
+            async for execution in executions
+        ]
+    except Exception as exc:
+        raise _service_error(exc) from exc
+    return WorkflowListResponse(workflows=workflows)
 
 
 @app.post(
