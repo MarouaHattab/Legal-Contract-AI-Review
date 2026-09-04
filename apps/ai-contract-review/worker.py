@@ -1,12 +1,5 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
-from activities import (
-    analyze_contract_artifact,
-    extract_contract_artifact,
-    revise_contract_report,
-    synthesize_contract_report,
-)
 from child_workflow import PDFSummaryWorkflow
 from parent_workflow import ContractReviewWorkflow
 from settings import get_contract_settings
@@ -20,23 +13,16 @@ async def main():
         settings.temporal_host,
         namespace=settings.temporal_namespace,
     )
-    
-    with ThreadPoolExecutor(max_workers=8) as activity_executor:
-        worker = Worker(
-            temporal_client,
-            task_queue=settings.orchestration_task_queue,
-            workflows=[ContractReviewWorkflow, PDFSummaryWorkflow],
-            activities=[
-                extract_contract_artifact,
-                analyze_contract_artifact,
-                synthesize_contract_report,
-                revise_contract_report,
-            ],
-            activity_executor=activity_executor,
-        )
+    worker = Worker(
+        temporal_client,
+        task_queue=settings.orchestration_task_queue,
+        workflows=[ContractReviewWorkflow, PDFSummaryWorkflow],
+        no_remote_activities=True,
+        max_concurrent_workflow_tasks=settings.workflow_worker_concurrency,
+    )
 
-        print(f"Worker running on: '{settings.orchestration_task_queue}'")
-        await worker.run()
+    print(f"Orchestration worker running on: '{settings.orchestration_task_queue}'")
+    await worker.run()
 
 
 if __name__ == "__main__":
