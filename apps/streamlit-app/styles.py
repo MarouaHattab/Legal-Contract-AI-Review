@@ -9,7 +9,7 @@ GLOBAL_STYLES = """
   --ui-line: #D8D8D3;
   --ui-paper: #F6F6F3;
 }
-html, body, [class*="st-"] {
+html, body, input, textarea, button {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 [data-testid="stAppViewContainer"] { background: var(--ui-paper); }
