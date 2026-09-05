@@ -96,8 +96,7 @@ WORKFLOW_TYPE_NAMES = {
     "ContractReviewWorkflow": "contract_review",
 }
 WORKFLOW_VISIBILITY_QUERY = (
-    "WorkflowType = 'PDFPipelineWorkflow' OR "
-    "WorkflowType = 'ContractReviewWorkflow'"
+    "WorkflowType = 'PDFPipelineWorkflow' OR WorkflowType = 'ContractReviewWorkflow'"
 )
 
 
