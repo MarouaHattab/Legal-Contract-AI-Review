@@ -5,6 +5,7 @@ WorkflowTypeValue = Literal["pdf", "contract_review"]
 
 SESSION_DEFAULTS: dict[str, object] = {
     "active_page": "Dashboard",
+    "pending_page": None,
     "selected_workflow_id": "",
     "selected_workflow_type": None,
     "last_started_workflow_id": "",
@@ -21,6 +22,17 @@ def initialize_session_state(state: MutableMapping[str, object]) -> None:
     for key, value in SESSION_DEFAULTS.items():
         if key not in state:
             state[key] = value
+
+
+def queue_navigation(state: MutableMapping[str, object], page: str) -> None:
+    state["pending_page"] = page
+
+
+def apply_pending_navigation(state: MutableMapping[str, object]) -> None:
+    pending_page = state.get("pending_page")
+    if pending_page:
+        state["active_page"] = pending_page
+    state["pending_page"] = None
 
 
 def select_workflow(

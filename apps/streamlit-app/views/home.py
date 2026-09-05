@@ -1,5 +1,6 @@
 import streamlit as st
 from components.layout import page_header, render_service_readiness
+from ui_state import queue_navigation
 
 
 def render_home() -> None:
@@ -23,7 +24,7 @@ def render_home() -> None:
             "keeping the source object untouched."
         )
         if st.button("Start PDF extraction", width="stretch"):
-            st.session_state["active_page"] = "Start PDF Workflow"
+            queue_navigation(st.session_state, "Start PDF Workflow")
             st.rerun()
     with contract_column:
         st.markdown("### Contract review")
@@ -32,7 +33,7 @@ def render_home() -> None:
             "and make a revision-aware human decision."
         )
         if st.button("Start contract review", width="stretch"):
-            st.session_state["active_page"] = "Start Contract Review"
+            queue_navigation(st.session_state, "Start Contract Review")
             st.rerun()
 
     st.markdown('<div class="ui-rule"></div>', unsafe_allow_html=True)

@@ -9,7 +9,7 @@ from components.report import render_contract_report
 from components.status import render_contract_status
 from resources import get_api_client
 from review_actions import ReviewStateChanged, guarded_submit_review
-from ui_state import select_workflow
+from ui_state import queue_navigation, select_workflow
 from validation import submission_fingerprint
 
 
@@ -86,7 +86,7 @@ def _submit_decision(
         st.session_state["last_review_submission"] = token
         st.session_state["polling_stopped_for"] = ""
         st.session_state["flash_message"] = response.message
-        st.session_state["active_page"] = "Workflow Status"
+        queue_navigation(st.session_state, "Workflow Status")
         st.rerun()
 
 
@@ -236,7 +236,7 @@ def render_human_review() -> None:
             icon=":material/flag:",
         )
         if st.button("Open result", icon=":material/description:"):
-            st.session_state["active_page"] = "Results / Previous Runs"
+            queue_navigation(st.session_state, "Results / Previous Runs")
             st.rerun()
         return
     if status.phase != "awaiting_review":

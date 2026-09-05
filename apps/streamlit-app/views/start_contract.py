@@ -6,6 +6,7 @@ from resources import get_api_client
 from ui_state import (
     clear_submission_guard,
     is_duplicate_submission,
+    queue_navigation,
     remember_started_workflow,
 )
 from validation import InputError, parse_contract_paths, submission_fingerprint
@@ -76,7 +77,7 @@ def render_start_contract() -> None:
                 st.session_state["flash_message"] = (
                     "Contract review started. Its live status is shown below."
                 )
-                st.session_state["active_page"] = "Workflow Status"
+                queue_navigation(st.session_state, "Workflow Status")
                 st.rerun()
 
     last_started = st.session_state.get("last_started_workflow_id", "")

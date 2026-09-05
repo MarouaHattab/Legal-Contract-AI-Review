@@ -5,7 +5,7 @@ from components.layout import page_header
 from components.status import render_contract_status, render_pdf_status
 from config import get_streamlit_settings
 from resources import get_api_client
-from ui_state import select_workflow
+from ui_state import queue_navigation, select_workflow
 from workflow_state import workflow_is_terminal
 
 WORKFLOW_TYPE_LABELS = {
@@ -60,7 +60,7 @@ def _render_live_status(workflow_id: str, workflow_type: str) -> None:
                 icon=":material/rate_review:",
             )
         ):
-            st.session_state["active_page"] = "Human Review"
+            queue_navigation(st.session_state, "Human Review")
             st.rerun()
 
         if status.result_available and st.button(
@@ -68,7 +68,7 @@ def _render_live_status(workflow_id: str, workflow_type: str) -> None:
             key=f"open_result_{workflow_key}",
             icon=":material/description:",
         ):
-            st.session_state["active_page"] = "Results / Previous Runs"
+            queue_navigation(st.session_state, "Results / Previous Runs")
             st.rerun()
 
         if st.button(

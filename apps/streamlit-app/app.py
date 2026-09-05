@@ -2,7 +2,7 @@ import streamlit as st
 from components.layout import render_sidebar_context
 from config import get_streamlit_settings
 from styles import apply_global_styles
-from ui_state import initialize_session_state
+from ui_state import apply_pending_navigation, initialize_session_state
 from views.home import render_home
 from views.human_review import render_human_review
 from views.results import render_results
@@ -19,6 +19,7 @@ st.set_page_config(
 )
 
 initialize_session_state(st.session_state)
+apply_pending_navigation(st.session_state)
 apply_global_styles()
 
 pages = {

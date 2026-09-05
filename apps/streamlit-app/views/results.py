@@ -8,7 +8,7 @@ from components.results import render_contract_result, render_pdf_result
 from config import get_streamlit_settings
 from models import WorkflowSummary
 from resources import get_api_client
-from ui_state import select_workflow
+from ui_state import queue_navigation, select_workflow
 from workflow_state import history_destination
 
 WORKFLOW_TYPE_LABELS = {
@@ -73,7 +73,10 @@ def _render_previous_runs() -> None:
             workflow_id=workflow.workflow_id,
             workflow_type=workflow.workflow_type.value,
         )
-        st.session_state["active_page"] = history_destination(workflow.execution_status)
+        queue_navigation(
+            st.session_state,
+            history_destination(workflow.execution_status),
+        )
         st.rerun()
 
 

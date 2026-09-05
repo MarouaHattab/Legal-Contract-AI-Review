@@ -6,6 +6,7 @@ from resources import get_api_client
 from ui_state import (
     clear_submission_guard,
     is_duplicate_submission,
+    queue_navigation,
     remember_started_workflow,
 )
 from validation import InputError, submission_fingerprint, validate_s3_pdf_uri
@@ -66,7 +67,7 @@ def render_start_pdf() -> None:
                 st.session_state["flash_message"] = (
                     "PDF workflow started. Its live status is shown below."
                 )
-                st.session_state["active_page"] = "Workflow Status"
+                queue_navigation(st.session_state, "Workflow Status")
                 st.rerun()
 
     last_started = st.session_state.get("last_started_workflow_id", "")
