@@ -73,6 +73,12 @@ def _render_previous_runs() -> None:
             workflow_id=workflow.workflow_id,
             workflow_type=workflow.workflow_type.value,
         )
+        st.session_state["result_workflow_type"] = (
+            "PDF extraction"
+            if workflow.workflow_type.value == "pdf"
+            else "Contract review"
+        )
+        st.session_state["result_workflow_id"] = workflow.workflow_id
         queue_navigation(
             st.session_state,
             history_destination(workflow.execution_status),
