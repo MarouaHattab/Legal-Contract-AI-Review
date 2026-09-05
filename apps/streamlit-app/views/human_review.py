@@ -36,6 +36,7 @@ def _handle_stale_review(workflow_id: str) -> None:
         latest_status = None
     if latest_status is not None:
         st.session_state["latest_known_revision"] = latest_status.current_revision
+        st.session_state["displayed_review_revision"] = latest_status.current_revision
     _set_review_notice(
         "warning",
         (
@@ -135,9 +136,10 @@ def _render_decisions(workflow_id: str, revision: int, reviewer: str) -> None:
     with approve_column:
         st.markdown("### Approve")
         st.write("Accept the report at the revision shown above.")
-        with st.form("approve_report_form"):
+        with st.form(f"approve_report_form_{revision}"):
             approve = st.form_submit_button(
                 "Approve this revision",
+                key=f"approve_revision_{revision}",
                 type="primary",
                 icon=":material/check:",
                 disabled=not reviewer,
@@ -152,14 +154,16 @@ def _render_decisions(workflow_id: str, revision: int, reviewer: str) -> None:
 
     with revise_column:
         st.markdown("### Request revision")
-        with st.form("revise_report_form"):
+        with st.form(f"revise_report_form_{revision}"):
             feedback = st.text_area(
                 "Required feedback",
+                key=f"revision_feedback_{revision}",
                 placeholder="Describe the specific changes required in the next report.",
                 max_chars=10_000,
             )
             revise = st.form_submit_button(
                 "Request revision",
+                key=f"request_revision_{revision}",
                 icon=":material/rate_review:",
                 disabled=not reviewer,
                 width="stretch",
@@ -258,6 +262,17 @@ def render_human_review() -> None:
 
     if report_state.current_revision != status.current_revision:
         _handle_stale_review(selected_id)
+
+    displayed_revision = st.session_state.get("displayed_review_revision")
+    if (
+        displayed_revision is not None
+        and displayed_revision != report_state.current_revision
+    ):
+        st.warning(
+            "The review state changed. Review the latest report before submitting a decision.",
+            icon=":material/sync_problem:",
+        )
+    st.session_state["displayed_review_revision"] = report_state.current_revision
 
     if report_state.completeness == "partial":
         st.warning(
