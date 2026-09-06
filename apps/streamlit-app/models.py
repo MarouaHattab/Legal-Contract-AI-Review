@@ -18,6 +18,19 @@ class WorkflowStartResponse(UIModel):
     workflow_id: str
 
 
+class UploadedPDF(UIModel):
+    filename: str
+    s3_uri: str
+    object_key: str
+    size_bytes: int = Field(gt=0)
+    sha256: str = Field(min_length=64, max_length=64)
+    content_type: Literal["application/pdf"]
+
+
+class PDFUploadResponse(UIModel):
+    files: list[UploadedPDF] = Field(min_length=1)
+
+
 class WorkflowSummary(UIModel):
     workflow_id: str
     run_id: str

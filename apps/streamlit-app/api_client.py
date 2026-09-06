@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal, TypeVar
 from urllib.parse import quote
 
@@ -9,6 +9,7 @@ from models import (
     ContractReviewResult,
     ContractWorkflowStatus,
     HealthResponse,
+    PDFUploadResponse,
     PDFWorkflowResult,
     PDFWorkflowStatus,
     ReviewActionResponse,
@@ -18,6 +19,8 @@ from models import (
 from pydantic import BaseModel, ValidationError
 
 ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
+UploadPayload = Sequence[tuple[str, bytes]]
+MultipartFiles = list[tuple[str, tuple[str, bytes, str]]]
 
 
 class APIClientError(Exception):
@@ -141,6 +144,7 @@ class DocumentAPIClient:
         *,
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        files: MultipartFiles | None = None,
         retry_safe: bool = False,
     ) -> ResponseModel:
         attempts = self._settings.read_attempts if retry_safe else 1
@@ -151,6 +155,7 @@ class DocumentAPIClient:
                     path,
                     json=json,
                     params=params,
+                    files=files,
                 )
             except httpx.TimeoutException as exc:
                 if attempt + 1 < attempts:
@@ -194,6 +199,18 @@ class DocumentAPIClient:
             WorkflowListResponse,
             params={"limit": limit},
             retry_safe=True,
+        )
+
+    def upload_pdfs(self, uploads: UploadPayload) -> PDFUploadResponse:
+        files: MultipartFiles = [
+            ("files", (filename, content, "application/pdf"))
+            for filename, content in uploads
+        ]
+        return self._request(
+            "POST",
+            "/uploads/pdfs",
+            PDFUploadResponse,
+            files=files,
         )
 
     def start_pdf(self, s3_path: str) -> WorkflowStartResponse:
