@@ -1,0 +1,165 @@
+name: temporal-101
+
+x-contract-worker: &contract-worker
+  image: temporal-101-contract-review:local
+  build:
+    context: ./apps/ai-contract-review
+  env_file:
+    - ./apps/ai-contract-review/.env
+  environment:
+    TEMPORAL_HOST: temporal:7233
+    TEMPORAL_NAMESPACE: default
+    TEMP_DIR: /tmp/contract-review
+  depends_on:
+    temporal:
+      condition: service_healthy
+  init: true
+  restart: unless-stopped
+  stop_grace_period: 30s
+
+x-pdf-worker: &pdf-worker
+  image: temporal-101-pdf-extraction:local
+  build:
+    context: ./apps/pdf-extraction
+  env_file:
+    - ./apps/pdf-extraction/.env
+  environment:
+    TEMPORAL_HOST: temporal:7233
+    TEMPORAL_NAMESPACE: default
+    TEMP_DIR: /tmp/pdf-pipeline
+  depends_on:
+    temporal:
+      condition: service_healthy
+  init: true
+  restart: unless-stopped
+  stop_grace_period: 30s
+
+services:
+  postgresql:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    volumes:
+      - temporal-postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:1.31.0
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgresql
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./setup/samples-server/compose/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "7233"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:2.49.1
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:8501
+    depends_on:
+      temporal:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  api:
+    image: temporal-101-api:local
+    build:
+      context: ./apps/client-app
+    env_file:
+      - ./apps/client-app/.env
+    environment:
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: default
+    depends_on:
+      temporal:
+        condition: service_healthy
+    init: true
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  streamlit:
+    image: temporal-101-streamlit:local
+    build:
+      context: ./apps/streamlit-app
+    env_file:
+      - ./apps/streamlit-app/.env
+    environment:
+      DOCUMENT_UI_API_BASE_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    ports:
+      - "8501:8501"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  contract-workflow-worker:
+    <<: *contract-worker
+    command: ["python", "worker.py"]
+
+  contract-document-worker:
+    <<: *contract-worker
+    command: ["python", "document_worker.py"]
+
+  contract-llm-worker:
+    <<: *contract-worker
+    command: ["python", "llm_worker.py"]
+
+  pdf-workflow-worker:
+    <<: *pdf-worker
+    command: ["python", "worker.py"]
+
+  pdf-document-worker:
+    <<: *pdf-worker
+    command: ["python", "document_worker.py"]
+
+volumes:
+  temporal-postgresql-data:

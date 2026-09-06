@@ -1,0 +1,36 @@
+# Environment files and secrets
+.env
+**/.env
+.env.*
+**/.env.*
+!.env.example
+!**/.env.example
+**/.streamlit/secrets.toml
+
+# Python and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+venv/
+
+# Excluded local verification content
+docs/
+test/
+tests/
+*.log
+*.pdf
+derived/
+output/
+outputs/
+temp/
+tmp/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
