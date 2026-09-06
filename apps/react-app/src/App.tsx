@@ -1,18 +1,6 @@
 import { Link, Route, Routes } from "react-router-dom"
 
-function WorkflowWorkspace() {
-  return (
-    <main className="shell">
-      <header className="page-header">
-        <p className="eyebrow">Document operations</p>
-        <h1>All workflows</h1>
-        <p className="page-summary">
-          Start, monitor, and review PDF and contract workflows.
-        </p>
-      </header>
-    </main>
-  )
-}
+import { WorkflowHome } from "./features/workflows/WorkflowHome"
 
 function NotFound() {
   return (
@@ -29,7 +17,7 @@ function NotFound() {
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<WorkflowWorkspace />} />
+      <Route path="/" element={<WorkflowHome />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   )
