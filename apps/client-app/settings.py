@@ -100,12 +100,6 @@ class APISettings(BaseSettings):
         ge=1_024,
         le=104_857_600,
     )
-    artifact_preview_max_bytes: int = Field(
-        default=2_097_152,
-        validation_alias="MARKDOWN_PREVIEW_MAX_BYTES",
-        ge=1_024,
-        le=10_485_760,
-    )
     s3_connect_timeout_seconds: float = Field(
         default=10,
         validation_alias="S3_CONNECT_TIMEOUT_SECONDS",

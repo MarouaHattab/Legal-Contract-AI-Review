@@ -1,5 +1,3 @@
-import asyncio
-import re
 import uuid
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
@@ -25,13 +23,7 @@ from api_models import (
     WorkflowStartResponse,
     WorkflowSummaryResponse,
 )
-from artifact_service import (
-    MarkdownArtifactNotFoundError,
-    MarkdownArtifactStorageError,
-    MarkdownArtifactValidationError,
-    read_markdown_artifact,
-)
-from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
 from pydantic import ValidationError
 from settings import get_api_settings
 from temporalio.client import Client, WorkflowUpdateFailedError
@@ -169,36 +161,6 @@ async def upload_pdfs(files: Annotated[list[UploadFile], File()]):
     except PDFUploadStorageError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return PDFUploadResponse(files=uploaded)
-
-
-@app.get("/artifacts/markdown", response_class=Response)
-async def get_markdown_artifact(
-    uri: str = Query(min_length=1, max_length=2_048),
-    download: bool = False,
-):
-    try:
-        artifact = await asyncio.to_thread(
-            read_markdown_artifact,
-            uri,
-            s3_client=get_s3_client(),
-            max_bytes=settings.artifact_preview_max_bytes,
-        )
-    except MarkdownArtifactValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except MarkdownArtifactNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except MarkdownArtifactStorageError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    filename = re.sub(r"[^A-Za-z0-9._-]", "_", artifact.filename)[:255]
-    disposition = "attachment" if download else "inline"
-    return Response(
-        content=artifact.content,
-        media_type="text/markdown",
-        headers={
-            "Content-Disposition": f'{disposition}; filename="{filename}"',
-        },
-    )
 
 
 @app.get(
