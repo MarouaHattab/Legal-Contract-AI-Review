@@ -1,5 +1,3 @@
-from html import escape
-
 import streamlit as st
 from models import ContractWorkflowStatus, PDFWorkflowStatus
 
@@ -22,21 +20,15 @@ PHASE_DESCRIPTIONS = {
 
 
 def render_phase_banner(phase: str) -> None:
-    phase_label = phase.replace("_", " ").upper()
+    phase_label = phase.replace("_", " ").title()
     description = PHASE_DESCRIPTIONS.get(
         phase,
         "The backend reported this workflow phase.",
     )
-    st.markdown(
-        (
-            '<section class="ui-phase-panel">'
-            '<p class="ui-phase-label">Current phase</p>'
-            f'<p class="ui-phase-word">{escape(phase_label)}</p>'
-            f'<p class="ui-phase-note">{escape(description)}</p>'
-            "</section>"
-        ),
-        unsafe_allow_html=True,
-    )
+    st.caption("Current phase")
+    st.subheader(phase_label)
+    st.write(description)
+    st.divider()
 
 
 def render_pdf_status(status: PDFWorkflowStatus) -> None:

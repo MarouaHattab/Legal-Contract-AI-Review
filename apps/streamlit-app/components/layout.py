@@ -4,10 +4,10 @@ from resources import get_api_client
 
 
 def page_header(kicker: str, title: str, description: str) -> None:
-    st.markdown(f'<p class="ui-kicker">{kicker}</p>', unsafe_allow_html=True)
+    st.caption(kicker)
     st.title(title)
-    st.markdown(description)
-    st.markdown('<div class="ui-rule"></div>', unsafe_allow_html=True)
+    st.write(description)
+    st.divider()
 
 
 def render_service_readiness() -> None:

@@ -36,7 +36,7 @@ def render_home() -> None:
             queue_navigation(st.session_state, "Start Contract Review")
             st.rerun()
 
-    st.markdown('<div class="ui-rule"></div>', unsafe_allow_html=True)
+    st.divider()
     st.caption(
         "Long-running work continues in Temporal. This page never waits for a "
         "workflow to finish."
