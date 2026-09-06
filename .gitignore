@@ -21,6 +21,7 @@ venv/
 docs/
 test/
 tests/
+.pnpm-store/
 *.log
 *.pdf
 derived/
