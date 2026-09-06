@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
 
   temporal:
-    image: temporalio/auto-setup:1.31.0
+    image: temporalio/auto-setup:1.29.7
     environment:
       DB: postgres12
       DB_PORT: 5432
@@ -67,7 +67,7 @@ services:
     volumes:
       - ./setup/samples-server/compose/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "7233"]
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
       interval: 5s
       timeout: 3s
       retries: 30
