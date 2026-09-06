@@ -145,18 +145,20 @@ class DocumentAPIClient:
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
         files: MultipartFiles | None = None,
+        timeout_seconds: float | None = None,
         retry_safe: bool = False,
     ) -> ResponseModel:
         attempts = self._settings.read_attempts if retry_safe else 1
         for attempt in range(attempts):
             try:
-                response = self._client.request(
-                    method,
-                    path,
-                    json=json,
-                    params=params,
-                    files=files,
-                )
+                request_options: dict[str, Any] = {
+                    "json": json,
+                    "params": params,
+                    "files": files,
+                }
+                if timeout_seconds is not None:
+                    request_options["timeout"] = timeout_seconds
+                response = self._client.request(method, path, **request_options)
             except httpx.TimeoutException as exc:
                 if attempt + 1 < attempts:
                     continue
@@ -211,6 +213,7 @@ class DocumentAPIClient:
             "/uploads/pdfs",
             PDFUploadResponse,
             files=files,
+            timeout_seconds=self._settings.upload_timeout_seconds,
         )
 
     def start_pdf(self, s3_path: str) -> WorkflowStartResponse:

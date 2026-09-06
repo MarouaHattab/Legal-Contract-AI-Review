@@ -19,6 +19,8 @@ class StreamlitSettings(BaseSettings):
 
     api_base_url: AnyHttpUrl = "http://127.0.0.1:8000"
     request_timeout_seconds: float = Field(default=10, gt=0, le=60)
+    upload_timeout_seconds: float = Field(default=300, gt=0, le=900)
+    upload_max_mib: int = Field(default=50, ge=1, le=100)
     poll_interval_seconds: float = Field(default=3, ge=2, le=60)
     read_attempts: int = Field(default=2, ge=1, le=3)
     workflow_list_limit: int = Field(default=50, ge=1, le=100)
