@@ -1,4 +1,6 @@
+boto3==1.43.32
 fastapi==0.115.12
 pydantic-settings==2.12.0
+python-multipart==0.0.20
 temporalio==1.29.0
 uvicorn==0.34.3

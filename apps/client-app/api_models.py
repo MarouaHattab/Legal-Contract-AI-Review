@@ -82,6 +82,19 @@ class WorkflowStartResponse(APIModel):
     workflow_id: str
 
 
+class UploadedPDFResponse(APIModel):
+    filename: str
+    s3_uri: str
+    object_key: str
+    size_bytes: int = Field(gt=0)
+    sha256: str = Field(min_length=64, max_length=64)
+    content_type: Literal["application/pdf"]
+
+
+class PDFUploadResponse(APIModel):
+    files: list[UploadedPDFResponse] = Field(min_length=1)
+
+
 class WorkflowSummaryResponse(APIModel):
     workflow_id: str
     run_id: str

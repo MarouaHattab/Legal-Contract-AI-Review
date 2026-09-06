@@ -2,6 +2,8 @@ import uuid
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from functools import lru_cache
+from typing import Annotated
 
 from api_models import (
     AssignRequest,
@@ -11,6 +13,7 @@ from api_models import (
     PDFArtifactResult,
     PDFProcessExecuteResponse,
     PDFProcessRequest,
+    PDFUploadResponse,
     PDFWorkflowResultResponse,
     PDFWorkflowStatusResponse,
     ReviewActionResponse,
@@ -20,12 +23,18 @@ from api_models import (
     WorkflowStartResponse,
     WorkflowSummaryResponse,
 )
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
 from pydantic import ValidationError
 from settings import get_api_settings
 from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.client import WorkflowExecutionStatus as WES
 from temporalio.service import RPCError, RPCStatusCode
+from upload_service import (
+    PDFUploadStorageError,
+    PDFUploadValidationError,
+    create_s3_client,
+    upload_pdf_batch,
+)
 
 settings = get_api_settings()
 
@@ -46,7 +55,7 @@ async def lifespan(application: FastAPI):
 app = FastAPI(
     title="Temporal Document Processing API",
     description="Starts and reviews durable PDF and contract workflows.",
-    version="1.1.0",
+    version="1.2.0",
     lifespan=lifespan,
 )
 
@@ -61,6 +70,11 @@ async def get_temporal_client() -> Client:
         )
         app.state.temporal_client = client
     return client
+
+
+@lru_cache(maxsize=1)
+def get_s3_client():
+    return create_s3_client(settings)
 
 
 def _service_error(exc: Exception) -> HTTPException:
@@ -128,6 +142,25 @@ async def readiness():
             detail="Temporal service is not ready.",
         )
     return {"status": "ready"}
+
+
+@app.post(
+    "/uploads/pdfs",
+    response_model=PDFUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_pdfs(files: Annotated[list[UploadFile], File()]):
+    try:
+        uploaded = await upload_pdf_batch(
+            files,
+            settings=settings,
+            s3_client=get_s3_client(),
+        )
+    except PDFUploadValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except PDFUploadStorageError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return PDFUploadResponse(files=uploaded)
 
 
 @app.get(
