@@ -1,15 +1,21 @@
+import asyncio
+import re
 import uuid
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Any
 
 from api_models import (
     AssignRequest,
     ContractReportQueryResponse,
     ContractReviewResultResponse,
     ContractWorkflowStatusResponse,
+    LLMConnectionTestResponse,
+    LLMSettingsResponse,
+    LLMSettingsUpdateRequest,
+    OperationalSettingsResponse,
     PDFArtifactResult,
     PDFProcessExecuteResponse,
     PDFProcessRequest,
@@ -23,9 +29,22 @@ from api_models import (
     WorkflowStartResponse,
     WorkflowSummaryResponse,
 )
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
+from artifact_service import (
+    MarkdownArtifactNotFoundError,
+    MarkdownArtifactStorageError,
+    MarkdownArtifactValidationError,
+    read_markdown_artifact,
+)
+from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
-from settings import get_api_settings
+from settings import (
+    LLMProbeError,
+    get_api_settings,
+    probe_llm_connection,
+    resolved_llm_settings,
+    update_llm_overlay,
+)
 from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.client import WorkflowExecutionStatus as WES
 from temporalio.service import RPCError, RPCStatusCode
@@ -57,6 +76,17 @@ app = FastAPI(
     description="Starts and reviews durable PDF and contract workflows.",
     version="1.2.0",
     lifespan=lifespan,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        origin.strip()
+        for origin in settings.cors_origins.split(",")
+        if origin.strip()
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -161,6 +191,127 @@ async def upload_pdfs(files: Annotated[list[UploadFile], File()]):
     except PDFUploadStorageError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return PDFUploadResponse(files=uploaded)
+
+
+@app.get("/artifacts/markdown", response_class=Response)
+async def get_markdown_artifact(
+    uri: str = Query(min_length=1, max_length=2_048),
+    download: bool = False,
+):
+    try:
+        artifact = await asyncio.to_thread(
+            read_markdown_artifact,
+            uri,
+            s3_client=get_s3_client(),
+            max_bytes=settings.artifact_preview_max_bytes,
+        )
+    except MarkdownArtifactValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except MarkdownArtifactNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except MarkdownArtifactStorageError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    filename = re.sub(r"[^A-Za-z0-9._-]", "_", artifact.filename)[:255]
+    disposition = "attachment" if download else "inline"
+    return Response(
+        content=artifact.content,
+        media_type="text/markdown",
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{filename}"',
+        },
+    )
+
+
+def _operational_settings() -> OperationalSettingsResponse:
+    llm = LLMSettingsResponse.model_validate(resolved_llm_settings())
+    return OperationalSettingsResponse(
+        s3_configured=bool(settings.s3_bucket and settings.s3_endpoint_url),
+        s3_bucket=settings.s3_bucket or "",
+        s3_endpoint_url=settings.s3_endpoint_url or "",
+        upload_max_files=settings.upload_max_files,
+        upload_max_bytes=settings.upload_max_bytes,
+        llm=llm,
+    )
+
+
+@app.get("/settings", response_model=OperationalSettingsResponse)
+async def get_settings():
+    return _operational_settings()
+
+
+@app.put("/settings/llm", response_model=OperationalSettingsResponse)
+async def put_llm_settings(request: Request):
+    try:
+        payload: dict[str, Any] = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid JSON body.") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Invalid JSON body.")
+
+    api_key = payload.pop("api_key", None)
+    normalized_key: str | None = None
+    if api_key is not None:
+        if not isinstance(api_key, str):
+            raise HTTPException(status_code=422, detail="API key must be a string.")
+        stripped = api_key.strip()
+        if stripped:
+            if len(stripped) > 500:
+                raise HTTPException(status_code=422, detail="API key is too long.")
+            normalized_key = stripped
+
+    try:
+        update = LLMSettingsUpdateRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Please check the submitted LLM settings.",
+        ) from exc
+
+    update_llm_overlay(
+        model=update.model,
+        base_url=update.base_url,
+        request_timeout_seconds=update.request_timeout_seconds,
+        api_key=normalized_key,
+    )
+    return _operational_settings()
+
+
+@app.post("/settings/llm/test", response_model=LLMConnectionTestResponse)
+async def test_llm_settings(request: Request):
+    try:
+        payload: dict[str, Any] = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid JSON body.") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Invalid JSON body.")
+
+    api_key = payload.pop("api_key", None)
+    normalized_key: str | None = None
+    if isinstance(api_key, str) and api_key.strip():
+        if len(api_key.strip()) > 500:
+            raise HTTPException(status_code=422, detail="API key is too long.")
+        normalized_key = api_key.strip()
+
+    try:
+        update = LLMSettingsUpdateRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Please check the submitted LLM settings.",
+        ) from exc
+
+    try:
+        result = await asyncio.to_thread(
+            probe_llm_connection,
+            model=update.model,
+            base_url=update.base_url,
+            request_timeout_seconds=update.request_timeout_seconds,
+            api_key=normalized_key,
+        )
+    except LLMProbeError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    return LLMConnectionTestResponse.model_validate(result)
 
 
 @app.get(
@@ -321,6 +472,9 @@ async def start_contract_review(request: StartReviewRequest):
                     "max_revisions": request.max_revisions,
                     "document_task_queue": settings.contract_document_task_queue,
                     "llm_task_queue": settings.contract_llm_task_queue,
+                    "markdown_s3_paths": request.markdown_s3_paths,
+                    "markdown_sha256s": request.markdown_sha256s,
+                    "markdown_size_bytes": request.markdown_size_bytes,
                 }
             ],
             id=workflow_id,
@@ -337,21 +491,11 @@ async def start_contract_review(request: StartReviewRequest):
 )
 async def get_review_status(workflow_id: str):
     handle, description = await _describe_workflow(workflow_id)
-    if description.status in (WES.RUNNING, WES.COMPLETED):
-        try:
-            state = await handle.query("get_status", result_type=dict)
-        except Exception as exc:
-            if description.status == WES.RUNNING:
-                raise _service_error(exc) from exc
-            state = {
-                "phase": "completed",
-                "current_revision": 0,
-                "reviewer": "",
-                "completeness": "unknown",
-                "documents": [],
-                "report_available": True,
-            }
-    else:
+    try:
+        state = await handle.query("get_status", result_type=dict)
+    except Exception as exc:
+        if description.status == WES.RUNNING:
+            raise _service_error(exc) from exc
         state = {
             "phase": _terminal_status(description.status),
             "current_revision": 0,
@@ -399,17 +543,33 @@ async def get_review_result(workflow_id: str):
             detail="Workflow is still running; poll the status endpoint.",
         )
     if description.status != WES.COMPLETED:
-        return ContractReviewResultResponse(
-            workflow_id=workflow_id,
-            execution_status=description.status.name,
-            final_status=_terminal_status(description.status),
-            completeness="failed",
-            report=None,
-            documents=[],
-            reviewer="",
-            revision_count=0,
-            error="Workflow ended without a domain result.",
-        )
+        try:
+            state = await handle.query("get_report", result_type=dict)
+            return ContractReviewResultResponse.model_validate(
+                {
+                    "workflow_id": workflow_id,
+                    "execution_status": description.status.name,
+                    "final_status": _terminal_status(description.status),
+                    "completeness": state.get("completeness") or "failed",
+                    "report": state.get("report"),
+                    "documents": state.get("documents") or [],
+                    "reviewer": state.get("reviewer") or "",
+                    "revision_count": state.get("current_revision") or 0,
+                    "error": "Workflow ended before human review completed.",
+                }
+            )
+        except (Exception, ValidationError):
+            return ContractReviewResultResponse(
+                workflow_id=workflow_id,
+                execution_status=description.status.name,
+                final_status=_terminal_status(description.status),
+                completeness="failed",
+                report=None,
+                documents=[],
+                reviewer="",
+                revision_count=0,
+                error="Workflow ended before human review completed.",
+            )
 
     try:
         result = await handle.result()

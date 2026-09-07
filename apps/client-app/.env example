@@ -17,3 +17,12 @@ PDF_UPLOAD_MAX_FILES=20
 PDF_UPLOAD_MAX_BYTES=52428800
 S3_CONNECT_TIMEOUT_SECONDS=10
 S3_READ_TIMEOUT_SECONDS=60
+MARKDOWN_PREVIEW_MAX_BYTES=2097152
+CORS_ORIGINS=http://localhost:8501,http://127.0.0.1:8501,http://localhost:5173,http://127.0.0.1:5173
+
+# Optional. Used only for the Settings view. Temporal LLM workers
+# still load their own contract-review environment at process start.
+# OPENROUTER_API_KEY=
+# OPENROUTER_MODEL=openai/gpt-4o-mini
+# BASE_URL=https://openrouter.ai/api/v1
+# LLM_REQUEST_TIMEOUT_SECONDS=60

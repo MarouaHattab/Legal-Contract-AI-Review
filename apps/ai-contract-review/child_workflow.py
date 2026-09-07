@@ -6,6 +6,7 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from helpers import (
         AnalyzeContractInput,
+        ArtifactReference,
         DocumentAnalysis,
         ExtractContractArtifactOutput,
         ExtractPDFInput,
@@ -37,7 +38,6 @@ LLM_RETRY_POLICY = RetryPolicy(
     maximum_attempts=4,
     non_retryable_error_types=[
         "EmptyContract",
-        "MalformedLLMResponse",
     ],
 )
 
@@ -61,15 +61,24 @@ class PDFSummaryWorkflow:
             if use_phase_2_options
             else {"retry_policy": DEFAULT_RETRY_POLICY}
         )
-        extracted = await workflow.execute_activity(
-            "extract_contract_artifact",
-            ExtractPDFInput(s3_path=params.s3_path),
-            result_type=ExtractContractArtifactOutput,
-            task_queue=document_task_queue,
-            start_to_close_timeout=timedelta(minutes=20),
-            heartbeat_timeout=timedelta(seconds=30),
-            **document_options,
-        )
+        if params.markdown_s3_path:
+            artifact = ArtifactReference(
+                s3_path=params.markdown_s3_path,
+                sha256=params.markdown_sha256,
+                size_bytes=params.markdown_size_bytes,
+                content_type=params.markdown_content_type or "text/markdown",
+            )
+        else:
+            extracted = await workflow.execute_activity(
+                "extract_contract_artifact",
+                ExtractPDFInput(s3_path=params.s3_path),
+                result_type=ExtractContractArtifactOutput,
+                task_queue=document_task_queue,
+                start_to_close_timeout=timedelta(minutes=20),
+                heartbeat_timeout=timedelta(seconds=30),
+                **document_options,
+            )
+            artifact = extracted.artifact
 
         llm_options = (
             {
@@ -84,7 +93,7 @@ class PDFSummaryWorkflow:
             "analyze_contract_artifact",
             AnalyzeContractInput(
                 source_s3_path=params.s3_path,
-                artifact=extracted.artifact,
+                artifact=artifact,
             ),
             result_type=DocumentAnalysis,
             task_queue=llm_task_queue,

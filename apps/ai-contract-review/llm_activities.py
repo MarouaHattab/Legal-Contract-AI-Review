@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import asdict, dataclass
 
 import json_repair
@@ -56,31 +57,54 @@ def chunk_text(text: str, max_chars: int = MAX_CHUNK_CHARACTERS) -> list[TextChu
     ]
 
 
+def _extract_json_object(content: str) -> str:
+    text = content.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, count=1, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text)
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        return text[start : end + 1]
+    return text
+
+
 def _parse_json_object(content: str, required_fields: tuple[str, ...]) -> dict:
     try:
-        parsed = json_repair.loads(content)
+        parsed = json_repair.loads(_extract_json_object(content))
     except Exception as exc:
         raise ApplicationError(
             "LLM returned malformed JSON",
             type="MalformedLLMResponse",
-            non_retryable=True,
+            non_retryable=False,
         ) from exc
 
-    if not isinstance(parsed, dict) or set(parsed) != set(required_fields):
+    if not isinstance(parsed, dict):
         raise ApplicationError(
             "LLM response did not match the required schema",
             type="MalformedLLMResponse",
-            non_retryable=True,
+            non_retryable=False,
         )
 
+    values: dict[str, str] = {}
     for field in required_fields:
-        if not isinstance(parsed[field], str) or not parsed[field].strip():
+        value = parsed.get(field)
+        if isinstance(value, list):
+            value = "\n".join(str(item).strip() for item in value if str(item).strip())
+        elif isinstance(value, dict):
+            value = json.dumps(value, ensure_ascii=False)
+        elif value is None:
+            value = ""
+        else:
+            value = str(value)
+        if not value.strip():
             raise ApplicationError(
                 f"LLM response field {field!r} must be a non-empty string",
                 type="MalformedLLMResponse",
-                non_retryable=True,
+                non_retryable=False,
             )
-    return parsed
+        values[field] = value.strip()
+    return values
 
 
 def parse_document_finding(content: str) -> DocumentFinding:
@@ -125,7 +149,7 @@ def _call_llm_content(prompt: str) -> str:
         raise ApplicationError(
             "LLM returned an empty response",
             type="MalformedLLMResponse",
-            non_retryable=True,
+            non_retryable=False,
         )
     return content
 

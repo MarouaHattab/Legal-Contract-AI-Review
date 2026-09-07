@@ -69,6 +69,8 @@ class ContractReviewWorkflow:
                         "chunks_processed": document.analysis.chunks_processed,
                         "characters_processed": document.analysis.characters_processed,
                         "artifact_s3_path": document.analysis.artifact.s3_path,
+                        "summary": document.analysis.summary,
+                        "key_risks": document.analysis.key_risks,
                     }
                 )
             documents.append(item)
@@ -165,14 +167,46 @@ class ContractReviewWorkflow:
         self._phase = "extracting"
         workflow_id = workflow.info().workflow_id
         task_queue = workflow.info().task_queue
+        reuse_markdown = workflow.patched("reuse-pipeline-markdown")
+        markdown_paths = list(params.markdown_s3_paths or [])
+        markdown_sha256s = list(params.markdown_sha256s or [])
+        markdown_sizes = list(params.markdown_size_bytes or [])
         handles = await asyncio.gather(
             *[
                 workflow.start_child_workflow(
                     PDFSummaryWorkflow.run,
-                    PDFSummaryInput(
-                        s3_path=s3_path,
-                        document_task_queue=params.document_task_queue,
-                        llm_task_queue=params.llm_task_queue,
+                    (
+                        PDFSummaryInput(
+                            s3_path=s3_path,
+                            document_task_queue=params.document_task_queue,
+                            llm_task_queue=params.llm_task_queue,
+                            markdown_s3_path=(
+                                markdown_paths[index]
+                                if index < len(markdown_paths)
+                                else ""
+                            ),
+                            markdown_sha256=(
+                                markdown_sha256s[index]
+                                if index < len(markdown_sha256s)
+                                else ""
+                            ),
+                            markdown_size_bytes=(
+                                markdown_sizes[index]
+                                if index < len(markdown_sizes)
+                                else 0
+                            ),
+                            markdown_content_type=(
+                                "text/markdown"
+                                if index < len(markdown_paths) and markdown_paths[index]
+                                else ""
+                            ),
+                        )
+                        if reuse_markdown
+                        else PDFSummaryInput(
+                            s3_path=s3_path,
+                            document_task_queue=params.document_task_queue,
+                            llm_task_queue=params.llm_task_queue,
+                        )
                     ),
                     id=f"{workflow_id}-pdf-{index + 1}",
                     task_queue=task_queue,

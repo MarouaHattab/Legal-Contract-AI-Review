@@ -18,7 +18,7 @@ class APIModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-def validate_s3_pdf_uri(value: str) -> str:
+def _validate_s3_uri(value: str, *, suffix: str, label: str) -> str:
     parsed = urlsplit(value)
     key = parsed.path.removeprefix("/")
     if (
@@ -30,10 +30,18 @@ def validate_s3_pdf_uri(value: str) -> str:
         or parsed.username
         or parsed.password
         or parsed.port
-        or PurePosixPath(key).suffix.lower() != ".pdf"
+        or PurePosixPath(key).suffix.lower() != suffix
     ):
-        raise ValueError("Must be a valid s3://bucket/key.pdf URI.")
+        raise ValueError(f"Must be a valid s3://bucket/key{suffix} {label} URI.")
     return value
+
+
+def validate_s3_pdf_uri(value: str) -> str:
+    return _validate_s3_uri(value, suffix=".pdf", label="PDF")
+
+
+def validate_s3_markdown_uri(value: str) -> str:
+    return _validate_s3_uri(value, suffix=".md", label="Markdown")
 
 
 class PDFProcessRequest(APIModel):
@@ -52,6 +60,13 @@ class StartReviewRequest(APIModel):
         description="One to 20 unique S3 PDF URIs.",
     )
     max_revisions: int = Field(default=2, ge=0, le=MAX_REVISIONS)
+    markdown_s3_paths: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_CONTRACT_DOCUMENTS,
+        description="Optional Markdown artifacts already produced for the same PDFs.",
+    )
+    markdown_sha256s: list[str] = Field(default_factory=list)
+    markdown_size_bytes: list[int] = Field(default_factory=list)
 
     @field_validator("s3_paths")
     @classmethod
@@ -60,6 +75,21 @@ class StartReviewRequest(APIModel):
         if len(set(normalized)) != len(normalized):
             raise ValueError("Duplicate contract documents are not allowed.")
         return normalized
+
+    @field_validator("markdown_s3_paths")
+    @classmethod
+    def validate_markdown_paths(cls, values: list[str]) -> list[str]:
+        return [validate_s3_markdown_uri(value.strip()) for value in values if value.strip()]
+
+    @model_validator(mode="after")
+    def validate_markdown_alignment(self):
+        if self.markdown_s3_paths and len(self.markdown_s3_paths) != len(self.s3_paths):
+            raise ValueError("markdown_s3_paths must have one URI per source PDF.")
+        if self.markdown_sha256s and len(self.markdown_sha256s) != len(self.s3_paths):
+            raise ValueError("markdown_sha256s must have one digest per source PDF.")
+        if self.markdown_size_bytes and len(self.markdown_size_bytes) != len(self.s3_paths):
+            raise ValueError("markdown_size_bytes must have one size per source PDF.")
+        return self
 
 
 class AssignRequest(APIModel):
@@ -170,6 +200,8 @@ class ContractDocumentProgressResponse(APIModel):
     chunks_processed: int | None = None
     characters_processed: int | None = None
     artifact_s3_path: str | None = None
+    summary: str = ""
+    key_risks: str = ""
 
 
 class ContractWorkflowStatusResponse(APIModel):
@@ -215,3 +247,33 @@ class ContractReviewResultResponse(APIModel):
 class ReviewActionResponse(APIModel):
     status: Literal["accepted"]
     message: str
+
+
+class LLMSettingsResponse(APIModel):
+    model: str = ""
+    base_url: str = ""
+    request_timeout_seconds: float | None = None
+    api_key_configured: bool
+    api_key_hint: str = ""
+
+
+class OperationalSettingsResponse(APIModel):
+    s3_configured: bool
+    s3_bucket: str = ""
+    s3_endpoint_url: str = ""
+    upload_max_files: int
+    upload_max_bytes: int
+    llm: LLMSettingsResponse
+
+
+class LLMSettingsUpdateRequest(APIModel):
+    model: str | None = Field(default=None, max_length=200)
+    base_url: str | None = Field(default=None, max_length=500)
+    request_timeout_seconds: float | None = Field(default=None, gt=0, le=600)
+
+
+class LLMConnectionTestResponse(APIModel):
+    ok: bool
+    message: str
+    model: str = ""
+    base_url: str = ""

@@ -24,6 +24,10 @@ class PDFSummaryInput:
     s3_path: str
     document_task_queue: str = ""
     llm_task_queue: str = ""
+    markdown_s3_path: str = ""
+    markdown_sha256: str = ""
+    markdown_size_bytes: int = 0
+    markdown_content_type: str = ""
 
 @dataclass(frozen=True)
 class PDFSummaryOutput:
@@ -40,6 +44,9 @@ class ContractReviewInput:
     max_revisions: int = 2
     document_task_queue: str = ""
     llm_task_queue: str = ""
+    markdown_s3_paths: list[str] | None = None
+    markdown_sha256s: list[str] | None = None
+    markdown_size_bytes: list[int] | None = None
 
 @dataclass(frozen=True)
 class ArtifactReference:

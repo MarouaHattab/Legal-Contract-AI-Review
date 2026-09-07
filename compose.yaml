@@ -92,6 +92,7 @@ services:
       context: ./apps/client-app
     env_file:
       - ./apps/pdf-extraction/.env
+      - ./apps/ai-contract-review/.env
       - ./apps/client-app/.env
     environment:
       TEMPORAL_HOST: temporal:7233
@@ -115,32 +116,24 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
 
-  streamlit:
-    image: temporal-101-streamlit:local
+  web:
+    image: temporal-101-web:local
     build:
-      context: ./apps/streamlit-app
-    env_file:
-      - ./apps/streamlit-app/.env
-    environment:
-      DOCUMENT_UI_API_BASE_URL: http://api:8000
+      context: ./apps/react-app
     depends_on:
       api:
         condition: service_healthy
-    init: true
     ports:
       - "8501:8501"
     healthcheck:
       test:
-        - CMD
-        - python
-        - -c
-        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8501/ >/dev/null || exit 1
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 10s
+      start_period: 20s
     restart: unless-stopped
-    stop_grace_period: 30s
 
   contract-workflow-worker:
     <<: *contract-worker

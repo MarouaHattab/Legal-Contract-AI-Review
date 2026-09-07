@@ -58,10 +58,6 @@ _SYNTHESIS_PROMPT = textwrap.dedent("""\
     - Do not include any text outside the JSON object.
 
     Do not include extra keys.
-
-    # Output:
-    
-    ```json 
     """)
 
 _REVISION_PROMPT = textwrap.dedent("""\
