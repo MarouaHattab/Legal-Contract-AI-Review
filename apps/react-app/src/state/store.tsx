@@ -24,6 +24,7 @@ export interface Notice {
 export interface AppState {
   documents: PipelineDocument[];
   contractWorkflowId: string;
+  contractPhase: string;
   reviewStep: ReviewStep;
   maxRevisions: number;
   lastRevisionFeedback: string;
@@ -45,6 +46,7 @@ export interface AppState {
 const defaultState = (): AppState => ({
   documents: [],
   contractWorkflowId: "",
+  contractPhase: "",
   reviewStep: "upload",
   maxRevisions: 2,
   lastRevisionFeedback: "",
@@ -152,6 +154,7 @@ interface StoreValue {
   setLastRevisionFeedback: (value: string) => void;
   setLastReviewSubmission: (value: string) => void;
   setLatestRevision: (value: number) => void;
+  setContractPhase: (value: string) => void;
   setDisplayedRevision: (value: number) => void;
   setSelectedWorkflow: (id: string, type: WorkflowType | "") => void;
   setConnection: (apiBaseUrl: string, pollIntervalSeconds: number) => void;
@@ -198,6 +201,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             workflowType === "contract_review"
               ? workflowId
               : state.contractWorkflowId,
+          contractPhase:
+            workflowType === "contract_review" ? "queued" : state.contractPhase,
         }),
       isDuplicate: (fingerprint) =>
         Boolean(state.lastStartedWorkflowId) &&
@@ -213,6 +218,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         persistPatch({ lastReviewSubmission }),
       setLatestRevision: (latestKnownRevision) =>
         persistPatch({ latestKnownRevision }),
+      setContractPhase: (contractPhase) => persistPatch({ contractPhase }),
       setDisplayedRevision: (displayedReviewRevision) =>
         persistPatch({ displayedReviewRevision }),
       setSelectedWorkflow: (selectedWorkflowId, selectedWorkflowType) =>
@@ -231,6 +237,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       continueContractOnReview: (workflowId) =>
         persistPatch({
           contractWorkflowId: workflowId,
+          contractPhase: "",
           reviewStep: "summary",
           selectedWorkflowId: workflowId,
           selectedWorkflowType: "contract_review",

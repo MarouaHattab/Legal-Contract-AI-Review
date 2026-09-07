@@ -95,6 +95,37 @@ const EXECUTION_TO_UI: Record<string, string> = {
   TIMED_OUT: "Timed Out",
 };
 
+export type WorkflowTone = "run" | "ok" | "warn" | "err";
+
+const EXECUTION_PRESENTATION: Record<
+  string,
+  { label: string; tone: WorkflowTone }
+> = {
+  RUNNING: { label: "Running", tone: "run" },
+  COMPLETED: { label: "Completed", tone: "ok" },
+  CANCELED: { label: "Cancelled", tone: "warn" },
+  CANCELLED: { label: "Cancelled", tone: "warn" },
+  TERMINATED: { label: "Cancelled", tone: "warn" },
+  TIMED_OUT: { label: "Timed out", tone: "warn" },
+  FAILED: { label: "Failed", tone: "err" },
+};
+
+export function executionIsActive(executionStatus: string): boolean {
+  return executionStatus.toUpperCase() === "RUNNING";
+}
+
+export function executionPresentation(executionStatus: string): {
+  label: string;
+  tone: WorkflowTone;
+} {
+  return (
+    EXECUTION_PRESENTATION[executionStatus.toUpperCase()] ?? {
+      label: executionStatus || "Unknown",
+      tone: "warn",
+    }
+  );
+}
+
 export function workflowIsTerminal(
   workflowType: WorkflowType,
   phase: string,

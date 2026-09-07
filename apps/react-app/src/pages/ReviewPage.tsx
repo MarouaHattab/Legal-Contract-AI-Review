@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Flash } from "../components/Flash";
 import { Stepper } from "../components/Stepper";
-import { useContractPhase } from "../hooks/useContractPhase";
 import { DecisionStep } from "../steps/DecisionStep";
 import { MarkdownStep } from "../steps/MarkdownStep";
 import { SummaryStep } from "../steps/SummaryStep";
@@ -16,11 +15,10 @@ import { useStore } from "../state/store";
 
 export function ReviewPage() {
   const { state, setReviewStep } = useStore();
-  const phase = useContractPhase(state.contractWorkflowId);
   const unlocked = unlockedReviewSteps(
     state.documents,
     state.contractWorkflowId,
-    phase,
+    state.contractPhase,
   );
   const current = normalizeReviewStep(
     state.reviewStep,

@@ -19,6 +19,7 @@ import { StepActions } from "../components/StepActions";
 import { StepFrame } from "../components/StepFrame";
 import { usePoll } from "../hooks/usePoll";
 import { submissionFingerprint } from "../lib/fingerprint";
+import { workflowIsTerminal } from "../lib/workflow";
 import { useStore } from "../state/store";
 
 export function DecisionStep({ onBack }: { onBack?: () => void }) {
@@ -29,6 +30,7 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
     setLastRevisionFeedback,
     setLastReviewSubmission,
     setLatestRevision,
+    setContractPhase,
     setDisplayedRevision,
     setReviewStep,
   } = useStore();
@@ -42,6 +44,13 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
 
   const contractId = state.contractWorkflowId;
   const revising = status?.phase === "revising";
+  const terminal = status
+    ? workflowIsTerminal(
+        "contract_review",
+        status.phase,
+        status.result_available,
+      )
+    : false;
 
   const { refresh, refreshing } = usePoll(
     async () => {
@@ -51,6 +60,7 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
       try {
         const latest = await api.getContractStatus(contractId);
         setStatus(latest);
+        setContractPhase(latest.phase);
         setLatestRevision(latest.current_revision);
         setReviewerName((current) => current || latest.reviewer);
         setError(null);
@@ -90,7 +100,7 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
       }
     },
     {
-      enabled: Boolean(contractId),
+      enabled: Boolean(contractId) && !terminal,
       intervalMs: state.pollIntervalSeconds * 1000,
     },
   );
@@ -111,6 +121,7 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
       setNotice({ level: "success", message: response.message });
       const latest = await api.getContractStatus(contractId);
       setStatus(latest);
+      setContractPhase(latest.phase);
     } catch (err) {
       setError(err);
     } finally {
@@ -150,6 +161,7 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
         setLatestRevision(latest.current_revision);
         setDisplayedRevision(latest.current_revision);
         setStatus(latest);
+        setContractPhase(latest.phase);
         setNotice({
           level: "warning",
           message:
@@ -170,6 +182,7 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
       }
       const after = await api.getContractStatus(contractId);
       setStatus(after);
+      setContractPhase(after.phase);
     } catch (err) {
       if (err instanceof APIError && err.kind === "conflict") {
         setNotice({

@@ -230,10 +230,8 @@ function LiveMonitor({
       }
     },
     {
-      enabled: Boolean(workflowId),
-      intervalMs: terminal
-        ? 30_000
-        : state.pollIntervalSeconds * 1000,
+      enabled: Boolean(workflowId) && !terminal,
+      intervalMs: state.pollIntervalSeconds * 1000,
     },
   );
 
@@ -306,7 +304,10 @@ function LiveMonitor({
             <DocumentProgress documents={contractStatus.documents} />
           ) : null}
           {terminal ? (
-            <p className="muted">Terminal state reached. Polling is slowed.</p>
+            <p className="muted">
+              Terminal state reached. Automatic polling has stopped; Refresh
+              remains available for a manual check.
+            </p>
           ) : (
             <p className="muted">
               Refreshing every {state.pollIntervalSeconds} seconds while this

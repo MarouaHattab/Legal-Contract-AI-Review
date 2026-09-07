@@ -34,15 +34,21 @@ export function usePoll(
       return;
     }
     let cancelled = false;
-    void run(false);
-    const timer = window.setInterval(() => {
+    let timer: number | undefined;
+
+    async function tick() {
+      await run(false);
       if (!cancelled) {
-        void run(false);
+        timer = window.setTimeout(tick, Math.max(options.intervalMs, 250));
       }
-    }, options.intervalMs);
+    }
+
+    void tick();
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
     };
   }, [options.enabled, options.intervalMs, run]);
 

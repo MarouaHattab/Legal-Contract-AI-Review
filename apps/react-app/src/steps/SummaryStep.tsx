@@ -19,7 +19,7 @@ import { StepActions } from "../components/StepActions";
 import { StepFrame } from "../components/StepFrame";
 import { usePoll } from "../hooks/usePoll";
 import { submissionFingerprint } from "../lib/fingerprint";
-import { REVIEW_DECISION_PHASES } from "../lib/workflow";
+import { REVIEW_DECISION_PHASES, workflowIsTerminal } from "../lib/workflow";
 import { pipelineReady } from "../state/logic";
 import { useStore } from "../state/store";
 
@@ -30,8 +30,15 @@ export function SummaryStep({
   onBack: () => void;
   onReview: () => void;
 }) {
-  const { state, rememberStarted, isDuplicate, setFlash, setReviewStep, setLatestRevision } =
-    useStore();
+  const {
+    state,
+    rememberStarted,
+    isDuplicate,
+    setFlash,
+    setReviewStep,
+    setLatestRevision,
+    setContractPhase,
+  } = useStore();
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<ContractWorkflowStatus | null>(null);
@@ -39,10 +46,13 @@ export function SummaryStep({
   const [result, setResult] = useState<ContractReviewResult | null>(null);
 
   const contractId = state.contractWorkflowId;
-  const polling =
-    Boolean(contractId) &&
-    Boolean(status) &&
-    ["extracting", "analyzing", "revising"].includes(status?.phase ?? "");
+  const terminal = status
+    ? workflowIsTerminal(
+        "contract_review",
+        status.phase,
+        status.result_available,
+      )
+    : false;
 
   const { refresh, refreshing } = usePoll(
     async () => {
@@ -52,6 +62,7 @@ export function SummaryStep({
       try {
         const latest = await api.getContractStatus(contractId);
         setStatus(latest);
+        setContractPhase(latest.phase);
         setLatestRevision(latest.current_revision);
         setError(null);
         if (latest.result_available) {
@@ -79,10 +90,8 @@ export function SummaryStep({
       }
     },
     {
-      enabled: Boolean(contractId),
-      intervalMs: polling
-        ? state.pollIntervalSeconds * 1000
-        : Math.max(state.pollIntervalSeconds, 8) * 1000,
+      enabled: Boolean(contractId) && !terminal,
+      intervalMs: state.pollIntervalSeconds * 1000,
     },
   );
 
@@ -187,7 +196,9 @@ export function SummaryStep({
     report?.documents.length || result?.documents.length || status?.documents.length,
   );
   const hasReport = Boolean(report?.report || result?.report);
-  const waiting = polling || !status;
+  const waiting =
+    !status ||
+    (!terminal && ["queued", "extracting", "analyzing", "revising"].includes(phase));
   const continueLabel =
     phase === "revising"
       ? "Open Review"
