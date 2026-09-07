@@ -1,4 +1,84 @@
-const MAX_CONTRACT_DOCUMENTS = 20;
+export const MAX_CONTRACT_DOCUMENTS = 20;
+
+export interface SelectableFile {
+  name: string;
+  size: number;
+  type: string;
+  lastModified: number;
+}
+
+export type FileRejectionCode = "type" | "size" | "duplicate" | "limit";
+
+export interface FileRejection {
+  name: string;
+  code: FileRejectionCode;
+  message: string;
+}
+
+interface PdfSelectionLimits {
+  maxFiles: number;
+  maxBytes: number;
+}
+
+function selectionKey(file: SelectableFile): string {
+  return `${file.name.trim().toLowerCase()}:${file.size}:${file.lastModified}`;
+}
+
+export function mergePdfSelection<T extends SelectableFile>(
+  current: readonly T[],
+  incoming: readonly T[],
+  limits: PdfSelectionLimits,
+): { files: T[]; rejections: FileRejection[] } {
+  const files = [...current];
+  const keys = new Set(files.map(selectionKey));
+  const rejections: FileRejection[] = [];
+
+  for (const file of incoming) {
+    const isPdf =
+      file.type.toLowerCase() === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      rejections.push({
+        name: file.name,
+        code: "type",
+        message: "Only PDF files are supported.",
+      });
+      continue;
+    }
+    if (file.size <= 0 || file.size > limits.maxBytes) {
+      rejections.push({
+        name: file.name,
+        code: "size",
+        message:
+          file.size <= 0
+            ? "The file is empty."
+            : `The file exceeds the ${formatBytes(limits.maxBytes)} limit.`,
+      });
+      continue;
+    }
+    const key = selectionKey(file);
+    if (keys.has(key)) {
+      rejections.push({
+        name: file.name,
+        code: "duplicate",
+        message: "This file is already selected.",
+      });
+      continue;
+    }
+    if (files.length >= limits.maxFiles) {
+      rejections.push({
+        name: file.name,
+        code: "limit",
+        message: `Only ${limits.maxFiles} documents can be reviewed at once.`,
+      });
+      continue;
+    }
+    files.push(file);
+    keys.add(key);
+  }
+
+  return { files, rejections };
+}
 
 export function validateS3PdfUri(value: string): string {
   const normalized = value.trim();
@@ -25,7 +105,10 @@ export function validateS3PdfUri(value: string): string {
   return normalized;
 }
 
-export function parseContractPaths(value: string): string[] {
+export function parseContractPaths(
+  value: string,
+  maxDocuments = MAX_CONTRACT_DOCUMENTS,
+): string[] {
   const raw = value
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -33,8 +116,10 @@ export function parseContractPaths(value: string): string[] {
   if (!raw.length) {
     throw new Error("Enter at least one S3 PDF URI.");
   }
-  if (raw.length > MAX_CONTRACT_DOCUMENTS) {
-    throw new Error(`Enter no more than ${MAX_CONTRACT_DOCUMENTS} documents.`);
+  if (raw.length > maxDocuments) {
+    throw new Error(
+      `Enter no more than ${maxDocuments} document${maxDocuments === 1 ? "" : "s"}.`,
+    );
   }
   const paths = raw.map(validateS3PdfUri);
   if (new Set(paths).size !== paths.length) {

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --port 8501"
+    "preview": "vite preview --port 8501",
+    "test": "node --experimental-strip-types --test src/lib/*.test.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
