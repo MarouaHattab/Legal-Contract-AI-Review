@@ -16,11 +16,16 @@ export function SettingsPage() {
 
   return (
     <>
-      <h1 className="page-title">Settings</h1>
+      <p className="eyebrow">Configuration desk</p>
+      <h1 className="page-title">Application settings</h1>
       <p className="page-meta">
         <span>Browser session</span>
         <span>FastAPI memory</span>
-        <span>Workers use their own env</span>
+        <span>Worker environment</span>
+      </p>
+      <p className="page-lead settings-lead">
+        Connection preferences live in this browser. Storage is read-only here,
+        while model changes are held by the current FastAPI process.
       </p>
       <div className="settings-desk">
         <nav className="settings-index" aria-label="Settings sections">

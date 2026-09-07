@@ -1557,12 +1557,16 @@ details.finding-card > .muted {
   overflow: hidden;
 }
 
+.settings-lead {
+  max-width: 68ch;
+}
+
 .settings-index {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #eef2f6;
+  border-right: 1px solid var(--line);
   padding: 16px 10px;
-  background: #f8fafc;
+  background: color-mix(in oklch, var(--paper) 70%, var(--blue-soft));
 }
 
 .settings-index button {
@@ -1577,7 +1581,7 @@ details.finding-card > .muted {
 }
 
 .settings-index button.active {
-  background: var(--paper);
+  background: var(--paper-raised);
   color: var(--ink);
   box-shadow: var(--shadow);
   font-weight: 600;
@@ -1593,11 +1597,125 @@ details.finding-card > .muted {
   padding: 28px;
 }
 
+.settings-section-head {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 2px;
+  padding-bottom: 18px;
+}
+
+.settings-section-head h2 {
+  margin-top: 8px;
+}
+
+.settings-section-head code,
+.field-help code {
+  color: var(--ink);
+}
+
+.settings-scope {
+  background: var(--blue-soft);
+  border-radius: 999px;
+  color: var(--blue-dark);
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+
+.settings-scope.read-only {
+  background: var(--ground);
+  color: var(--mute);
+}
+
+.settings-scope.process {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .settings-actions {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 8px;
+}
+
+.settings-callout,
+.worker-boundary {
+  align-items: flex-start;
+  background: color-mix(in oklch, var(--paper) 70%, var(--blue-soft));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  display: grid;
+  font-size: 12px;
+  gap: 4px;
+  grid-template-columns: 150px minmax(0, 1fr);
+  margin-top: 18px;
+  padding: 14px;
+}
+
+.settings-callout span,
+.worker-boundary p {
+  color: var(--mute);
+  margin: 0;
+}
+
+.worker-boundary {
+  background: color-mix(in oklch, var(--accent-soft) 55%, var(--paper-raised));
+  border-color: color-mix(in oklch, var(--accent) 28%, var(--line));
+  grid-template-columns: 1fr;
+  margin: 4px 0 8px;
+}
+
+.storage-facts {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.settings-fact {
+  background: color-mix(in oklch, var(--paper-raised) 75%, white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  margin: 0;
+  min-width: 0;
+  padding: 14px;
+}
+
+.settings-fact dt {
+  color: var(--mute);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.settings-fact dd {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 7px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.config-status {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.config-status::before {
+  background: currentColor;
+  border-radius: 50%;
+  content: "";
+  height: 7px;
+  width: 7px;
+}
+
+.config-status.ok {
+  color: var(--ok);
+}
+
+.config-status.err {
+  color: var(--err);
 }
 
 .app-footer {
@@ -1999,6 +2117,10 @@ details.finding-card > .muted {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .storage-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workflow-toolbar,
   .inspect-form {
     grid-template-columns: 1fr;
@@ -2018,7 +2140,7 @@ details.finding-card > .muted {
   .settings-index {
     flex-direction: row;
     border-right: 0;
-    border-bottom: 1px solid #eef2f6;
+    border-bottom: 1px solid var(--line);
     overflow: auto;
   }
 
@@ -2129,6 +2251,11 @@ details.finding-card > .muted {
 
   .stepper .hint {
     display: none;
+  }
+
+  .storage-facts,
+  .settings-callout {
+    grid-template-columns: 1fr;
   }
 
   .section-heading.split,
