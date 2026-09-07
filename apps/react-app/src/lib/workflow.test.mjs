@@ -80,3 +80,22 @@ test("formats recent workflow times without exposing raw ISO strings", () => {
   );
   assert.equal(workflow.relativeWorkflowTime("not-a-date", now), "Unknown");
 });
+
+test("maps contract phases onto the three-stage evidence progress rail", () => {
+  assert.deepEqual(workflow.contractProgress("extracting"), {
+    activeIndex: 0,
+    title: "Summarizing evidence",
+  });
+  assert.deepEqual(workflow.contractProgress("analyzing"), {
+    activeIndex: 1,
+    title: "Writing consolidated report",
+  });
+  assert.deepEqual(workflow.contractProgress("revising"), {
+    activeIndex: 1,
+    title: "Revising report",
+  });
+  assert.deepEqual(workflow.contractProgress("awaiting_review"), {
+    activeIndex: 2,
+    title: "Ready for human review",
+  });
+});

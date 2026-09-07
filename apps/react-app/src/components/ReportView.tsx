@@ -5,7 +5,6 @@ import type {
   ContractReviewResult,
   DocumentOutcome,
 } from "../api/types";
-import { riskLabel, riskTone } from "../lib/risk";
 import { downloadText } from "../lib/s3";
 import { terminalPresentation } from "../lib/workflow";
 import { ReportList, RiskHero } from "./ReportSections";
@@ -99,13 +98,11 @@ export function ContractReportBlock({
       </section>
     );
   }
-  const tone = riskTone(report.overall_risk_level);
   return (
     <section className="result-section">
       <div className="result-section-head">
         <h3>{title}</h3>
         <div className="result-section-tools">
-          <span className={`risk-chip ${tone}`}>{riskLabel(tone)} risk</span>
           {actions}
         </div>
       </div>
@@ -117,7 +114,7 @@ export function ContractReportBlock({
           emptyLabel="No recommended actions were returned."
         />
         <ReportList
-          title="Cross-contract risks"
+          title="Key cross-contract risks"
           text={report.top_cross_contract_risks}
           emptyLabel="No cross-contract risks were returned."
           tone="risk"

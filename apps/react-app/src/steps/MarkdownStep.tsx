@@ -162,16 +162,6 @@ export function MarkdownStep({
       }
     >
       <ErrorBanner error={error} />
-      <StepActions
-        note="Stay on this step to read the Markdown. You do not need to scroll to the end."
-        continueLabel={
-          state.contractWorkflowId ? "Go to summary" : "Start summary"
-        }
-        continueEnabled={ready}
-        busy={busy}
-        onBack={onBack}
-        onContinue={() => void startSummary()}
-      />
       {converting ? (
         <p className="muted">
           Converting. Status updates every {state.pollIntervalSeconds} seconds

@@ -1,5 +1,5 @@
 import { itemHeading, splitOverallRisk, splitReportItems } from "../lib/reportText";
-import { riskTone } from "../lib/risk";
+import { riskLabel, riskTone } from "../lib/risk";
 
 export function RiskHero({ text }: { text: string }) {
   const tone = riskTone(text);
@@ -9,7 +9,7 @@ export function RiskHero({ text }: { text: string }) {
       <div className="risk-hero-rating">
         <p className="caption">Overall risk</p>
         <p className="risk-level">{rating}</p>
-        <span className={`risk-chip ${tone}`}>{rating}</span>
+        <span className={`risk-chip ${tone}`}>{riskLabel(tone)} risk</span>
       </div>
       <div className="risk-hero-copy">
         <p className="caption">Why this rating</p>

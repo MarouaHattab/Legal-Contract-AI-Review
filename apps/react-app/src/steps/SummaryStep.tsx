@@ -8,15 +8,10 @@ import type {
 } from "../api/types";
 import { DocumentFindings, DocumentProgress } from "../components/DocumentFindings";
 import { ErrorBanner } from "../components/ErrorBanner";
-import {
-  FindingsPlaceholder,
-  GenerationWait,
-  ReportPlaceholder,
-} from "../components/GenerationWait";
-import { PhaseBanner } from "../components/PhaseBanner";
 import { LiveOrFinalReport, TerminalBanner } from "../components/ReportView";
 import { StepActions } from "../components/StepActions";
 import { StepFrame } from "../components/StepFrame";
+import { WorkflowProgress } from "../components/WorkflowProgress";
 import { usePoll } from "../hooks/usePoll";
 import { submissionFingerprint } from "../lib/fingerprint";
 import { REVIEW_DECISION_PHASES, workflowIsTerminal } from "../lib/workflow";
@@ -156,13 +151,6 @@ export function SummaryStep({
         }
       >
         <ErrorBanner error={error} />
-        <StepActions
-          continueLabel="Start summary"
-          continueEnabled={pipelineReady(state.documents)}
-          busy={busy}
-          onBack={onBack}
-          onContinue={() => void startSummary()}
-        />
         {pipelineReady(state.documents) ? (
           <section className="result-section">
             <div className="result-section-head">
@@ -192,13 +180,6 @@ export function SummaryStep({
 
   const phase = status?.phase ?? "";
   const canReview = REVIEW_DECISION_PHASES.has(phase);
-  const hasFindings = Boolean(
-    report?.documents.length || result?.documents.length || status?.documents.length,
-  );
-  const hasReport = Boolean(report?.report || result?.report);
-  const waiting =
-    !status ||
-    (!terminal && ["queued", "extracting", "analyzing", "revising"].includes(phase));
   const continueLabel =
     phase === "revising"
       ? "Open Review"
@@ -225,47 +206,13 @@ export function SummaryStep({
       }
     >
       <ErrorBanner error={error} />
-      <StepActions
-        note={reviewNote}
-        continueLabel={continueLabel}
-        continueEnabled={canReview}
-        onBack={onBack}
-        onContinue={onReview}
-      />
-      {status ? (
-        <PhaseBanner
-          phase={status.phase}
-          executionStatus={status.execution_status}
-          waiting={waiting}
-          refreshing={refreshing}
-          onRefresh={() => void refresh()}
-        />
-      ) : (
-        <p className="muted">Loading contract status from FastAPI.</p>
-      )}
-      <GenerationWait
+      {!result ? (
+        <WorkflowProgress
         phase={phase}
         intervalSeconds={state.pollIntervalSeconds}
         refreshing={refreshing}
         onRefresh={() => void refresh()}
-        hasFindings={hasFindings}
-        hasReport={hasReport}
-      />
-      {phase === "extracting" ? (
-        <div className="banner">
-          Summarizing the Markdown from the previous step. The PDF is not
-          uploaded or extracted again.
-        </div>
-      ) : null}
-      {phase === "analyzing" ? (
-        <div className="banner">
-          Summaries are in. The consolidated report is being written.
-        </div>
-      ) : null}
-      {phase === "revising" ? (
-        <div className="banner">
-          A revision is running. Open Review to wait for the new report.
-        </div>
+        />
       ) : null}
       {result ? (
         <>
@@ -274,16 +221,17 @@ export function SummaryStep({
             finalStatus={result.final_status}
           />
           {result.error ? <div className="banner err">{result.error}</div> : null}
+          <LiveOrFinalReport payload={result} />
           {result.documents.length ? (
             <DocumentFindings
               documents={result.documents}
               animationPrefix={`${result.workflow_id}:${result.revision_count}:final`}
             />
           ) : null}
-          <LiveOrFinalReport payload={result} />
         </>
       ) : report ? (
         <>
+          {report.report ? <LiveOrFinalReport payload={report} /> : null}
           {report.documents.length ? (
             <DocumentFindings
               documents={report.documents}
@@ -292,16 +240,9 @@ export function SummaryStep({
           ) : status?.documents.length ? (
             <DocumentProgress documents={status.documents} />
           ) : null}
-          {report.report ? (
-            <LiveOrFinalReport payload={report} />
-          ) : (
-            <ReportPlaceholder />
-          )}
         </>
       ) : status?.documents.length ? (
         <DocumentProgress documents={status.documents} />
-      ) : waiting ? (
-        <FindingsPlaceholder />
       ) : null}
     </StepFrame>
   );

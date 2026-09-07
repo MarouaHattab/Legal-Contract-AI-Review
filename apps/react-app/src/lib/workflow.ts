@@ -190,6 +190,28 @@ export function relativeWorkflowTime(
   }).format(new Date(timestamp));
 }
 
+export function contractProgress(phase: string): {
+  activeIndex: number;
+  title: string;
+} {
+  if (phase === "analyzing") {
+    return { activeIndex: 1, title: "Writing consolidated report" };
+  }
+  if (phase === "revising") {
+    return { activeIndex: 1, title: "Revising report" };
+  }
+  if (phase === "awaiting_review") {
+    return { activeIndex: 2, title: "Ready for human review" };
+  }
+  if (CONTRACT_TERMINAL_PHASES.has(phase)) {
+    return { activeIndex: 2, title: phaseLabel(phase) };
+  }
+  if (phase === "queued" || !phase) {
+    return { activeIndex: 0, title: "Preparing evidence" };
+  }
+  return { activeIndex: 0, title: "Summarizing evidence" };
+}
+
 export function workflowIsTerminal(
   workflowType: WorkflowType,
   phase: string,

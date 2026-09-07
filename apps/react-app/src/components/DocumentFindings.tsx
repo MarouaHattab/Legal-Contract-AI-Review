@@ -14,7 +14,7 @@ export function DocumentFindings({
     <section className="result-section">
       <div className="result-section-head">
         <div>
-          <h3>Document summary</h3>
+          <h3>Per-document findings</h3>
           <p className="muted">
             {documents.length} document{documents.length === 1 ? "" : "s"}{" "}
             summarized from the Markdown already produced.

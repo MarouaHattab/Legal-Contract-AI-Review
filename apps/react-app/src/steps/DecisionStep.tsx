@@ -8,15 +8,10 @@ import type {
 } from "../api/types";
 import { DocumentFindings } from "../components/DocumentFindings";
 import { ErrorBanner } from "../components/ErrorBanner";
-import {
-  FindingsPlaceholder,
-  GenerationWait,
-  ReportPlaceholder,
-} from "../components/GenerationWait";
-import { PhaseBanner } from "../components/PhaseBanner";
 import { LiveOrFinalReport, TerminalBanner } from "../components/ReportView";
 import { StepActions } from "../components/StepActions";
 import { StepFrame } from "../components/StepFrame";
+import { WorkflowProgress } from "../components/WorkflowProgress";
 import { usePoll } from "../hooks/usePoll";
 import { submissionFingerprint } from "../lib/fingerprint";
 import { workflowIsTerminal } from "../lib/workflow";
@@ -178,6 +173,8 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
       setFlash(response.message);
       if (decision === "revise") {
         setLastRevisionFeedback(normalized);
+        setReport(null);
+        setResult(null);
         setReviewStep("decision");
       }
       const after = await api.getContractStatus(contractId);
@@ -241,51 +238,41 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
       }
     >
       <ErrorBanner error={error} />
-      {status ? (
-        <PhaseBanner
-          phase={status.phase}
-          executionStatus={status.execution_status}
-          waiting={["extracting", "analyzing", "revising"].includes(status.phase)}
+      {!result ? (
+        <WorkflowProgress
+          phase={phase}
+          intervalSeconds={state.pollIntervalSeconds}
           refreshing={refreshing}
           onRefresh={() => void refresh()}
         />
-      ) : (
-        <p className="muted">Loading review state from FastAPI.</p>
-      )}
-      <GenerationWait
-        phase={phase}
-        intervalSeconds={state.pollIntervalSeconds}
-        refreshing={refreshing}
-        onRefresh={() => void refresh()}
-        hasReport={Boolean(report?.report || result?.report)}
-      />
+      ) : null}
       {revising ? (
-        <>
-          <div className="banner">
-            Stay on this page. The revised report will appear here when Temporal
-            finishes.
-          </div>
+        <section className="revision-receipt">
+          <p className="eyebrow">Revision request received</p>
+          <h3>The report will update here automatically</h3>
+          <p>
+            You can leave this page open. Temporal is generating a new report
+            from the feedback below.
+          </p>
           {state.lastRevisionFeedback ? (
-            <>
-              <p className="caption">Feedback that was sent</p>
-              <p>{state.lastRevisionFeedback}</p>
-            </>
+            <blockquote>{state.lastRevisionFeedback}</blockquote>
           ) : null}
-          <FindingsPlaceholder />
-          <ReportPlaceholder />
-        </>
+        </section>
       ) : null}
       {phase === "awaiting_review" && report ? (
         <>
-          {report.report ? (
-            <LiveOrFinalReport payload={report} />
-          ) : (
-            <ReportPlaceholder />
-          )}
-          <div className="stack">
-            <h3>Your review</h3>
-            <p className="muted">Enter a reviewer name before approve or feedback.</p>
-            <div className="field">
+          {report.report ? <LiveOrFinalReport payload={report} /> : null}
+          <section className="review-panel">
+            <div className="section-heading">
+              <p className="eyebrow">Human-in-the-loop decision</p>
+              <h3>Review this revision</h3>
+              <p className="muted">
+                Assign a reviewer, then approve the current report or request a
+                focused revision.
+              </p>
+            </div>
+            <div className="reviewer-row">
+              <div className="field">
               <label htmlFor="reviewer">Reviewer name</label>
               <input
                 id="reviewer"
@@ -294,24 +281,25 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
                 value={reviewerName}
                 onChange={(event) => setReviewerName(event.target.value)}
               />
+              </div>
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => void assignReviewer()}
+              >
+                {status?.reviewer ? "Update reviewer" : "Assign reviewer"}
+              </button>
             </div>
-            <button
-              type="button"
-              className="btn"
-              disabled={busy}
-              onClick={() => void assignReviewer()}
-            >
-              Save reviewer
-            </button>
             {!reviewer ? (
-              <p className="muted">
+              <p className="field-help">
                 Save a reviewer name, then approve or send feedback.
               </p>
             ) : null}
-            <div className="row two">
-              <div className="stack">
+            <div className="decision-grid">
+              <article className="decision-card approve">
                 <h3>Approve</h3>
-                <p>Accept the current summary and report.</p>
+                <p>Accept this report as the final reviewed outcome.</p>
                 <button
                   type="button"
                   className="btn primary"
@@ -320,10 +308,10 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
                 >
                   Approve
                 </button>
-              </div>
-              <div className="stack">
-                <h3>Feedback</h3>
-                <p>Ask for a revised report.</p>
+              </article>
+              <article className="decision-card revise">
+                <h3>Request changes</h3>
+                <p>Explain exactly what the next report should address.</p>
                 <div className="field">
                   <label htmlFor="feedback">Feedback</label>
                   <textarea
@@ -331,7 +319,7 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
                     maxLength={10_000}
                     value={feedback}
                     onChange={(event) => setFeedback(event.target.value)}
-                    placeholder="What should the next revision change?"
+                    placeholder="Example: compare termination notice periods and strengthen the liability recommendation."
                   />
                 </div>
                 <button
@@ -340,11 +328,11 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
                   disabled={!reviewer || busy}
                   onClick={() => void submitDecision("revise")}
                 >
-                  Send feedback
+                  Request revision
                 </button>
-              </div>
+              </article>
             </div>
-          </div>
+          </section>
         </>
       ) : null}
       {result ? (
@@ -360,24 +348,6 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
               below.
             </div>
           ) : null}
-          <div className="row four">
-            <dl className="fact">
-              <dt>Execution status</dt>
-              <dd>{result.execution_status}</dd>
-            </dl>
-            <dl className="fact">
-              <dt>Assigned reviewer</dt>
-              <dd>{result.reviewer || "Unassigned"}</dd>
-            </dl>
-            <dl className="fact">
-              <dt>Revision count</dt>
-              <dd>{result.revision_count}</dd>
-            </dl>
-            <dl className="fact">
-              <dt>Report completeness</dt>
-              <dd>{result.completeness}</dd>
-            </dl>
-          </div>
           <LiveOrFinalReport payload={result} />
           <DocumentFindings
             documents={result.documents}

@@ -13,6 +13,7 @@
   --warn: #85651d;
   --err: #9d3f35;
   --accent: #b65d3b;
+  --accent-soft: #f0dfd5;
   --radius: 20px;
   --radius-small: 11px;
   --shadow: 0 18px 50px rgba(45, 63, 51, 0.09);
@@ -230,7 +231,7 @@ a {
 }
 
 .stepper li.done .node {
-  background: #4c86f2;
+  background: var(--blue-strong);
   color: #fff;
 }
 
@@ -1244,45 +1245,166 @@ details summary {
   }
 }
 
-.wait-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 18px;
-  margin-bottom: 18px;
-  border: 1px solid #d7e4fb;
-  background: var(--blue-soft);
-  border-radius: 14px;
+.workflow-progress {
+  background: color-mix(in oklch, var(--paper-raised) 70%, var(--blue-soft));
+  border: 1px solid color-mix(in oklch, var(--blue) 30%, var(--line));
+  border-radius: var(--radius);
+  margin-bottom: 22px;
+  padding: 20px;
 }
 
-.wait-card strong {
-  display: block;
+.workflow-progress-head {
+  align-items: flex-start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.workflow-progress-head h3,
+.workflow-progress-head p {
+  margin: 0;
+}
+
+.workflow-progress-head h3 {
+  font-size: 22px;
+}
+
+.workflow-progress-head .eyebrow {
   margin-bottom: 4px;
 }
 
-.wait-card p {
-  margin: 0 0 4px;
-}
-
-.wait-card .muted {
-  margin: 0;
-}
-
-.wait-inline {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.wait-inline p {
-  margin: 0;
+.workflow-progress-head > div > p:last-child {
   color: var(--mute);
+  font-size: 13px;
+  margin-top: 5px;
 }
 
-.result-card.wait {
-  background: #f3f7fd;
-  border-style: dashed;
+.evidence-rail {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+}
+
+.evidence-rail li {
+  align-items: center;
+  border-top: 2px solid var(--line);
+  color: var(--mute);
+  display: flex;
+  font-size: 11px;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.evidence-rail li > span {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 24px;
+  font-size: 10px;
+  height: 24px;
+  justify-content: center;
+}
+
+.evidence-rail li.done,
+.evidence-rail li.current {
+  border-color: var(--blue);
+  color: var(--ink);
+}
+
+.evidence-rail li.done > span {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue-dark);
+}
+
+.evidence-rail li.current > span {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #f7f4ea;
+}
+
+.workflow-progress-note {
+  color: var(--mute);
+  font-size: 11px;
+  margin: 14px 0 0;
+}
+
+.revision-receipt {
+  background: color-mix(in oklch, var(--accent-soft) 35%, var(--paper-raised));
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius-small) var(--radius-small) 0;
+  margin-bottom: 22px;
+  padding: 18px 20px;
+}
+
+.revision-receipt h3,
+.revision-receipt p {
+  margin-top: 0;
+}
+
+.revision-receipt blockquote {
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 14px;
+  margin: 16px 0 0;
+  padding: 14px 0 0;
+}
+
+.review-panel {
+  background: color-mix(in oklch, var(--paper-raised) 82%, white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-top: 24px;
+  padding: 22px;
+}
+
+.reviewer-row {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.decision-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(240px, 0.75fr) minmax(320px, 1.25fr);
+  margin-top: 20px;
+}
+
+.decision-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px;
+}
+
+.decision-card h3,
+.decision-card > p {
+  margin-top: 0;
+}
+
+.decision-card > p {
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.decision-card.approve {
+  background: #edf5ec;
+}
+
+.decision-card.revise {
+  background: color-mix(in oklch, var(--paper-raised) 70%, var(--accent-soft));
+}
+
+.decision-card.approve .btn {
+  margin-top: auto;
 }
 
 .phase-card p {
@@ -1843,7 +1965,10 @@ details.finding-card > .muted {
     padding-top: 24px;
   }
 
-  .stepper,
+  .step-frame-footer {
+    position: static;
+  }
+
   .row.two,
   .row.three,
   .row.four,
@@ -1851,10 +1976,23 @@ details.finding-card > .muted {
   .report-grid,
   .report-facts,
   .risk-hero,
-  .wait-card,
   .intake-grid,
-  .settings-desk {
+  .settings-desk,
+  .decision-grid {
     grid-template-columns: 1fr;
+  }
+
+  .workflow-progress-head,
+  .reviewer-row {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-progress-head .spinner {
+    display: none;
+  }
+
+  .workflow-progress-head .text-button {
+    justify-self: start;
   }
 
   .metric-grid {
@@ -1875,10 +2013,6 @@ details.finding-card > .muted {
     padding-right: 0;
     padding-bottom: 14px;
     border-bottom: 1px solid rgba(16, 35, 61, 0.08);
-  }
-
-  .stepper-line {
-    display: none;
   }
 
   .settings-index {
@@ -1971,6 +2105,30 @@ details.finding-card > .muted {
     width: calc(100% - 24px);
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .stepper-wrap {
+    margin-bottom: 26px;
+    padding: 0 4px;
+  }
+
+  .stepper-line {
+    left: 10%;
+    right: 10%;
+    top: 14px;
+  }
+
+  .stepper .node {
+    height: 28px;
+    width: 28px;
+  }
+
+  .stepper .name {
+    font-size: 11px;
+  }
+
+  .stepper .hint {
+    display: none;
   }
 
   .section-heading.split,
