@@ -126,6 +126,70 @@ export function executionPresentation(executionStatus: string): {
   );
 }
 
+export type ExecutionFilter = "all" | "active" | "completed" | "attention";
+
+export function executionCategory(
+  executionStatus: string,
+): Exclude<ExecutionFilter, "all"> {
+  const presentation = executionPresentation(executionStatus);
+  if (presentation.tone === "run") {
+    return "active";
+  }
+  if (presentation.tone === "ok") {
+    return "completed";
+  }
+  return "attention";
+}
+
+export function summarizeExecutions(
+  records: ReadonlyArray<{ execution_status: string }>,
+): { total: number; active: number; completed: number; attention: number } {
+  return records.reduce(
+    (summary, record) => {
+      summary.total += 1;
+      summary[executionCategory(record.execution_status)] += 1;
+      return summary;
+    },
+    { total: 0, active: 0, completed: 0, attention: 0 },
+  );
+}
+
+export function relativeWorkflowTime(
+  value: string,
+  now = Date.now(),
+): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return "Unknown";
+  }
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+  if (seconds < 60) {
+    return "Just now";
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} min ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours} hr ago`;
+  }
+  const days = Math.floor(hours / 24);
+  if (days === 1) {
+    return "Yesterday";
+  }
+  if (days < 7) {
+    return `${days} days ago`;
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: new Date(timestamp).getFullYear() === new Date(now).getFullYear()
+      ? undefined
+      : "numeric",
+  }).format(new Date(timestamp));
+}
+
 export function workflowIsTerminal(
   workflowType: WorkflowType,
   phase: string,

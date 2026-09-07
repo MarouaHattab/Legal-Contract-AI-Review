@@ -46,3 +46,37 @@ test("maps execution outcomes to consistent dashboard labels and tones", () => {
     tone: "warn",
   });
 });
+
+test("summarizes workflow records for dashboard decisions", () => {
+  const records = [
+    { execution_status: "RUNNING" },
+    { execution_status: "COMPLETED" },
+    { execution_status: "COMPLETED" },
+    { execution_status: "FAILED" },
+    { execution_status: "TERMINATED" },
+  ];
+
+  assert.deepEqual(workflow.summarizeExecutions(records), {
+    total: 5,
+    active: 1,
+    completed: 2,
+    attention: 2,
+  });
+});
+
+test("formats recent workflow times without exposing raw ISO strings", () => {
+  const now = Date.parse("2026-09-07T12:00:00.000Z");
+  assert.equal(
+    workflow.relativeWorkflowTime("2026-09-07T11:59:40.000Z", now),
+    "Just now",
+  );
+  assert.equal(
+    workflow.relativeWorkflowTime("2026-09-07T11:55:00.000Z", now),
+    "5 min ago",
+  );
+  assert.equal(
+    workflow.relativeWorkflowTime("2026-09-07T09:00:00.000Z", now),
+    "3 hr ago",
+  );
+  assert.equal(workflow.relativeWorkflowTime("not-a-date", now), "Unknown");
+});
