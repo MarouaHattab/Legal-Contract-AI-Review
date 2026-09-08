@@ -14,7 +14,7 @@ import { StepFrame } from "../components/StepFrame";
 import { WorkflowProgress } from "../components/WorkflowProgress";
 import { usePoll } from "../hooks/usePoll";
 import { submissionFingerprint } from "../lib/fingerprint";
-import { workflowIsTerminal } from "../lib/workflow";
+import { workflowViewIsSettled } from "../lib/workflow";
 import { useStore } from "../state/store";
 
 export function DecisionStep({ onBack }: { onBack?: () => void }) {
@@ -39,11 +39,12 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
 
   const contractId = state.contractWorkflowId;
   const revising = status?.phase === "revising";
-  const terminal = status
-    ? workflowIsTerminal(
+  const settled = status
+    ? workflowViewIsSettled(
         "contract_review",
         status.phase,
         status.result_available,
+        Boolean(result),
       )
     : false;
 
@@ -95,7 +96,7 @@ export function DecisionStep({ onBack }: { onBack?: () => void }) {
       }
     },
     {
-      enabled: Boolean(contractId) && !terminal,
+      enabled: Boolean(contractId) && !settled,
       intervalMs: state.pollIntervalSeconds * 1000,
     },
   );

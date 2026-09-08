@@ -28,6 +28,36 @@ test("treats all result-bearing and known final phases as terminal", () => {
   );
 });
 
+test("keeps a terminal workflow view syncing until its result is loaded", () => {
+  assert.equal(
+    workflow.workflowViewIsSettled(
+      "contract_review",
+      "approved",
+      false,
+      false,
+    ),
+    false,
+  );
+  assert.equal(
+    workflow.workflowViewIsSettled(
+      "contract_review",
+      "approved",
+      true,
+      false,
+    ),
+    false,
+  );
+  assert.equal(
+    workflow.workflowViewIsSettled(
+      "contract_review",
+      "approved",
+      true,
+      true,
+    ),
+    true,
+  );
+});
+
 test("maps execution outcomes to consistent dashboard labels and tones", () => {
   assert.deepEqual(workflow.executionPresentation("RUNNING"), {
     label: "Running",

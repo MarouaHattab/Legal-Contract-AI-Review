@@ -224,6 +224,17 @@ export function workflowIsTerminal(
     .has(phase);
 }
 
+export function workflowViewIsSettled(
+  workflowType: WorkflowType,
+  phase: string,
+  resultAvailable: boolean,
+  resultLoaded: boolean,
+): boolean {
+  return (
+    resultLoaded && workflowIsTerminal(workflowType, phase, resultAvailable)
+  );
+}
+
 export function uiStatus(
   phase: string,
   executionStatus: string,
