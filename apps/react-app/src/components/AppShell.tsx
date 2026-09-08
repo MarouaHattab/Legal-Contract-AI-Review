@@ -50,16 +50,17 @@ export function AppShell() {
     <div className="app-shell">
       <header className="topbar">
         <NavLink to="/" className="brand" end>
-          <span className="brand-name">Contract Review</span>
-          <span className="brand-note">AI-assisted legal analysis</span>
+          <span className="brand-name">Contract review</span>
         </NavLink>
         <nav className="work-nav" aria-label="Workspace">
           <NavLink to="/" end>
             Review
           </NavLink>
           <NavLink to="/status">Status</NavLink>
-          <NavLink to="/settings">Settings</NavLink>
         </nav>
+        <NavLink to="/settings" className="settings-link">
+          Settings
+        </NavLink>
       </header>
       <main className="workspace">
         <Outlet />
