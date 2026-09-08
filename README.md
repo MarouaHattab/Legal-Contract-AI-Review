@@ -1,6 +1,5 @@
 <h1 align="center">DurableLex — Agentic Contract Intelligence with Temporal</h1>
 
-> **Durable, human-governed AI workflows for multi-contract analysis.**
 
 DurableLex is an end-to-end agentic document system built around durable workflows. It converts PDFs into traceable Markdown artifacts, analyzes contracts in parallel, synthesizes cross-document risks with an LLM, and pauses safely for a human reviewer to approve or revise the report.
 
@@ -8,10 +7,6 @@ The browser interface is a demonstration client. The core of the project is the 
 
 
 **Video demo** → [Watch the demo](https://github.com/user-attachments/assets/aac6d261-1684-4518-a1a8-0e259c448056) · **Demo client** → [localhost:8501](http://localhost:8501) · **Temporal UI** → [localhost:8080](http://localhost:8080) · **FastAPI docs** → [localhost:8000/docs](http://localhost:8000/docs)
-
-<p align="center">
-  <img src="assets/diagrams/01-temporal-system-overview.png" width="100%" alt="DurableLex system overview"/>
-</p>
 
 ## Demo
 
@@ -85,6 +80,10 @@ A conventional web request or in-memory background task makes that lifecycle fra
 ## Architecture
 
 The system has two workflow paths. The first turns one PDF into a durable Markdown artifact. The second coordinates multi-document analysis and a human review loop. Both use the same API, Temporal cluster, PostgreSQL persistence, and S3-compatible storage.
+
+<p align="center">
+  <img src="assets/diagrams/01-temporal-system-overview.png" width="100%" alt="DurableLex system overview"/>
+</p>
 
 ### System boundaries
 
