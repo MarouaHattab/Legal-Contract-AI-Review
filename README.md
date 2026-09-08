@@ -6,11 +6,6 @@ DurableLex is an end-to-end agentic document system built around durable workflo
 
 The browser interface is a demonstration client. The core of the project is the Temporal architecture: deterministic orchestration, isolated activities, child workflows, retries, heartbeats, Queries, Signals, Updates, and durable human-in-the-loop state.
 
-## GitHub About
-
-Durable human-in-the-loop contract intelligence with Temporal, FastAPI, parallel agentic AI workflows, PDF extraction, and LLM risk synthesis.
-
-**Topics:** `temporal` · `temporal-workflows` · `agentic-ai` · `human-in-the-loop` · `contract-analysis` · `document-intelligence` · `fastapi` · `python` · `llm` · `distributed-systems` · `workflow-orchestration` · `docker` · `postgresql` · `react`
 
 **Video demo** → [demo Video](assets/temporal-contract-review-demo.mp4) · **Demo client** → [localhost:8501](http://localhost:8501) · **Temporal UI** → [localhost:8080](http://localhost:8080) · **FastAPI docs** → [localhost:8000/docs](http://localhost:8000/docs)
 
