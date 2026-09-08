@@ -4,7 +4,7 @@ Temporal Contract Review is an end-to-end agentic document system built around d
 
 The browser interface is a demonstration client. The core of the project is the Temporal architecture: deterministic orchestration, isolated activities, child workflows, retries, heartbeats, Queries, Signals, Updates, and durable human-in-the-loop state.
 
-**Video demo** → [Add the project walkthrough](assets/temporal-contract-review-demo.mp4) · **Demo client** → [localhost:8501](http://localhost:8501) · **Temporal UI** → [localhost:8080](http://localhost:8080) · **FastAPI docs** → [localhost:8000/docs](http://localhost:8000/docs)
+**Video demo** → [demo Video](assets/temporal-contract-review-demo.mp4) · **Demo client** → [localhost:8501](http://localhost:8501) · **Temporal UI** → [localhost:8080](http://localhost:8080) · **FastAPI docs** → [localhost:8000/docs](http://localhost:8000/docs)
 
 <p align="center">
   <img src="assets/diagrams/01-temporal-system-overview.png" width="100%" alt="Temporal Contract Review system overview"/>

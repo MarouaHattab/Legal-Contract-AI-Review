@@ -4,11 +4,11 @@ import { IconEmail, IconGithub, IconLinkedin } from "./Icons";
 const creatorLinks = {
   github:
     import.meta.env.VITE_CREATOR_GITHUB_URL ||
-    "https://github.com/MarouaHattab/Hierarchical-RL-Agents-for-Legal-Contract-Analysis",
+    "https://github.com/MarouaHattab/",
   email:
     import.meta.env.VITE_CREATOR_EMAIL_URL ||
     "mailto:maroua.hattab@polytechnicien.tn",
-  linkedin: import.meta.env.VITE_CREATOR_LINKEDIN_URL || "",
+  linkedin: import.meta.env.VITE_CREATOR_LINKEDIN_URL || "https://www.linkedin.com/in/marouahattab/",
 };
 
 function ExternalLink({
