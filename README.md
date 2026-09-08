@@ -1,4 +1,4 @@
-# DurableLex — Agentic Contract Intelligence with Temporal
+<h1 align="center">DurableLex — Agentic Contract Intelligence with Temporal</h1>
 
 > **Durable, human-governed AI workflows for multi-contract analysis.**
 
@@ -7,11 +7,44 @@ DurableLex is an end-to-end agentic document system built around durable workflo
 The browser interface is a demonstration client. The core of the project is the Temporal architecture: deterministic orchestration, isolated activities, child workflows, retries, heartbeats, Queries, Signals, Updates, and durable human-in-the-loop state.
 
 
-**Video demo** → [demo Video](assets/temporal-contract-review-demo.mp4) · **Demo client** → [localhost:8501](http://localhost:8501) · **Temporal UI** → [localhost:8080](http://localhost:8080) · **FastAPI docs** → [localhost:8000/docs](http://localhost:8000/docs)
+**Video demo** → [Watch the demo](https://github.com/user-attachments/assets/aac6d261-1684-4518-a1a8-0e259c448056) · **Demo client** → [localhost:8501](http://localhost:8501) · **Temporal UI** → [localhost:8080](http://localhost:8080) · **FastAPI docs** → [localhost:8000/docs](http://localhost:8000/docs)
 
 <p align="center">
   <img src="assets/diagrams/01-temporal-system-overview.png" width="100%" alt="DurableLex system overview"/>
 </p>
+
+## Demo
+
+The video below shows the contract review workflow in action.
+
+https://github.com/user-attachments/assets/aac6d261-1684-4518-a1a8-0e259c448056
+
+---
+
+## Table of contents
+
+- [Demo](#demo)
+- [Why this matters](#why-this-matters)
+- [Project at a glance](#project-at-a-glance)
+- [What I built](#what-i-built)
+- [Architecture](#architecture)
+  - [System boundaries](#system-boundaries)
+  - [Task queues and worker isolation](#task-queues-and-worker-isolation)
+- [PDF extraction workflow](#pdf-extraction-workflow)
+- [Contract review workflow](#contract-review-workflow)
+  - [Parallel document analysis](#1-parallel-document-analysis)
+  - [Cross-contract synthesis](#2-cross-contract-synthesis)
+  - [Human review](#3-human-review)
+  - [Complete execution story](#complete-execution-story)
+- [Reliability model](#reliability-model)
+- [API](#api)
+- [Run the project](#run-the-project)
+- [Example contract review request](#example-contract-review-request)
+- [Project structure](#project-structure)
+- [Engineering decisions](#engineering-decisions)
+- [Current limits](#current-limits)
+- [Skills demonstrated](#skills-demonstrated)
+- [Stack](#stack)
 
 ## Why this matters
 
@@ -46,25 +79,6 @@ A conventional web request or in-memory background task makes that lifecycle fra
 - Added FastAPI endpoints for asynchronous workflow start, status, reports, results, artifact access, and workflow visibility.
 - Packaged PostgreSQL, Temporal, Temporal UI, API, workers, and the demo client in one Docker Compose stack.
 - Built a demonstration interface for multi-file upload, S3 input, automatic status polling, workflow inspection, report review, and operational settings.
-
----
-
-## Demo
-
-The project walkthrough should show both the user experience and the workflow history behind it.
-
-[Watch the demo video](assets/temporal-contract-review-demo.mp4)
-
-Recommended recording sequence:
-
-1. Upload two PDF contracts or enter two S3 paths.
-2. Start PDF extraction and show that FastAPI returns workflow IDs.
-3. Open Temporal UI and show queue dispatch and worker execution.
-4. Show the generated Markdown artifacts and per-document progress.
-5. Start the contract review and show the parent creating child workflows.
-6. Wait for the consolidated report and assign a reviewer.
-7. Submit revision feedback and show the report return to human review.
-8. Approve the revision and inspect the completed Temporal result.
 
 ---
 
