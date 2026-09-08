@@ -1,6 +1,5 @@
 <h1 align="center">DurableLex — Agentic Contract Intelligence with Temporal</h1>
 
-> **Durable, human-governed AI workflows for multi-contract analysis.**
 
 DurableLex is an end-to-end agentic document system built around durable workflows. It converts PDFs into traceable Markdown artifacts, analyzes contracts in parallel, synthesizes cross-document risks with an LLM, and pauses safely for a human reviewer to approve or revise the report.
 
