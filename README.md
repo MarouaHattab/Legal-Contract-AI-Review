@@ -67,7 +67,7 @@ This project treats those requirements as a workflow-design problem. FastAPI sta
   React/Vite demo client        ───── browser presentation layer only
 ~~~
 
-The diagram above is intentionally text-based so the repository remains readable without a diagram renderer. For portfolio visuals, use the image prompts in [DIAGRAM_PROMPTS.md](DIAGRAM_PROMPTS.md).
+The diagram above is intentionally text-based so the repository remains readable without a diagram renderer. The full image-generation prompts are included at the end of this README.
 
 ## Two workflow paths
 
@@ -155,7 +155,6 @@ This is the important distinction from a conventional background task: the revie
 .
 ├── compose.yaml
 ├── README.md
-├── DIAGRAM_PROMPTS.md
 ├── apps/
 │   ├── client-app/              FastAPI API and S3 artifact/upload services
 │   ├── ai-contract-review/      Parent/child workflows and contract activities
@@ -277,8 +276,108 @@ This project is a practical example of:
 
 > Built a Temporal-first AI contract review platform in Python. The system fans out multi-document PDF processing into durable child workflows, uses heartbeating and retryable activities for S3 and LLM integrations, synthesizes a consolidated risk report, and pauses safely for human approval or revision through Temporal Updates. FastAPI exposes the workflow API, Docker Compose packages the stack, and React provides a lightweight demonstration client.
 
-## Diagram assets
+## Demo video
 
-The repository intentionally keeps architecture visuals separate from the implementation. Use [DIAGRAM_PROMPTS.md](DIAGRAM_PROMPTS.md) to generate hand-drawn Excalidraw/Miro-style PNG or SVG assets, then place them under <code>docs/diagrams/</code> and add them to the relevant README sections.
+Add your walkthrough recording at <code>assets/temporal-contract-review-demo.mp4</code> and link it here:
 
-The prompts are written to show Temporal as the center of the design and to avoid the common “AI app screenshot” look. They emphasize queues, workflow boundaries, child execution, durable waiting, and the human decision loop.
+[Watch the complete Temporal workflow demo](assets/temporal-contract-review-demo.mp4)
+
+For the strongest portfolio story, record a short sequence that shows:
+
+1. uploading two PDFs;
+2. the API returning a workflow ID immediately;
+3. Temporal workers processing child workflows in parallel;
+4. document progress and generated Markdown artifacts;
+5. LLM report synthesis;
+6. the workflow waiting for human review;
+7. a reviewer assigning themselves and requesting a revision;
+8. the revised report returning to review;
+9. final approval and the durable completed result.
+
+## Diagram prompts for README visuals
+
+Generate the diagrams below with ChatGPT image generation, then save the exported PNG or SVG files under <code>docs/diagrams/</code>. These prompts deliberately produce an Excalidraw/Miro workshop-board style instead of a glossy SaaS illustration.
+
+### Shared visual direction
+
+Prefix every prompt with:
+
+~~~text
+Create a clean hand-drawn systems architecture diagram that looks made by a thoughtful human in Excalidraw or Miro: warm-white paper canvas, dark navy marker outlines, slightly imperfect rounded rectangles and arrows, limited flat colors, generous whitespace, clear hierarchy, and short readable labels. Use navy/blue for Temporal and API boundaries, green for workers and activities, amber for task queues and durable state, purple for external services, and a small coral accent only for failures or review decisions. Use a consistent handwritten-style sans-serif font, but keep all technical labels legible. No 3D, no gradients, no photorealism, no stock icons, no glossy SaaS dashboard, no Mermaid syntax, no code screenshot, no fake terminal window, no decorative cloud clutter, and no invented components. Generate a 16:9 landscape image at 1800–2200 pixels wide. Keep every label inside its shape and leave generous margins.
+~~~
+
+### 1. Temporal system overview
+
+~~~text
+Draw the high-level architecture for an AI contract review system called “Temporal-first AI Contract Review”. Put Temporal Server at the center inside a large navy outlined boundary, with PostgreSQL below it as durable persistence. On the left, show FastAPI :8000 and a small browser box labelled “React demo client”. On the right, show “PDF extraction workers” and “Contract review workers”.
+
+Inside the contract worker group, show “parent workflow”, “child workflow × N”, “document activities”, and “LLM activities”. Outside the Temporal boundary, show “S3-compatible storage” and “OpenRouter”. Draw arrows for client → FastAPI, FastAPI → Temporal, Temporal → task queues, workers ↔ Temporal, document activities ↔ S3, LLM activities ↔ OpenRouter, and results → FastAPI → client. Add the callout: “Temporal owns durable state, retries, timers, and human review waiting.”
+~~~
+
+### 2. Durable PDF extraction pipeline
+
+~~~text
+Draw a left-to-right workflow titled “PDFPipelineWorkflow — durable PDF to Markdown”. Show six numbered nodes: “PDF URI received”, “workflow started”, “Temporal task queue”, “convert_pdf_to_markdown activity”, “Markdown artifact uploaded”, and “workflow result returned”.
+
+Show FastAPI on the far left, Temporal Server and pdf-pipeline-queue in the middle, and the PDF document worker on the right. Attach S3-compatible storage to the conversion activity. Annotate the activity with “download”, “PyMuPDF extraction”, “SHA-256”, “safe derived key”, and “retry policy”. Add the note “invalid PDF / unsafe output key → non-retryable failure”. Emphasize that FastAPI starts the workflow and does not perform PDF processing.
+~~~
+
+### 3. Parallel contract fan-out
+
+~~~text
+Draw “ContractReviewWorkflow — fan-out into isolated child workflows”. Place a parent workflow box in the center. Draw three parallel arrows to green cards labelled “PDFSummaryWorkflow — contract 1”, “PDFSummaryWorkflow — contract 2”, and “PDFSummaryWorkflow — contract N”.
+
+Inside every child card show “extract_contract_artifact” and “analyze_contract_artifact”, then return “DocumentOutcome” objects to the parent. Below the parent show “completeness = complete | partial | failed”. On the left show “N S3 PDF paths” entering through FastAPI and Temporal. On the right show “synthesize_contract_report”. Add the callout: “Each child has its own event history; one failed document does not erase the others.” Include the queue labels contract-review-queue, contract-document-processing-queue, and contract-llm-queue.
+~~~
+
+### 4. Retries and heartbeats
+
+~~~text
+Create a close-up explainer titled “Why the activities are durable”. Show a Temporal workflow box connected to an activity worker. Split a long PDF or LLM operation into handwritten checkpoints. Draw dotted heartbeat arrows back to Temporal labelled “stage”, “page range”, and “characters processed”.
+
+Above the activity draw a retry timeline with “attempt 1”, “2s”, “attempt 2”, “4s”, “attempt 3”, and “up to 60s”. Show a green branch labelled “transient network / provider error → retry” and a coral branch labelled “invalid PDF / unsafe output key → non-retryable”. Add: “The worker may restart; Temporal still knows what happened.”
+~~~
+
+### 5. Human-in-the-loop state
+
+~~~text
+Draw a state-machine diagram titled “Human review is durable workflow state”. Put awaiting_review in a large amber rounded rectangle with the note “workflow.wait_condition — zero worker compute while waiting”.
+
+From the left show “GET status / report” as a blue Temporal Query arrow. From above show “assign reviewer” as a green Temporal Signal arrow. From the right show a reviewer decision card with “approve” going to “approved / completed” and “revise + feedback” going to “revise_contract_report activity”. Loop the revision state back to awaiting_review with “revision_count + 1”.
+
+Add a validator checklist: “reviewer assigned”, “expected revision matches”, “decision valid”, “feedback required for revise”, and “max revisions enforced”. Make it obvious that a reviewer may respond much later without losing workflow state.
+~~~
+
+### 6. Complete portfolio story
+
+~~~text
+Create one polished architecture board titled “Temporal-first AI Contract Review — complete execution story”. Use five horizontal zones: “Client”, “API”, “Temporal”, “Workers”, and “External services”.
+
+Client contains “browser / React demo”. API contains “FastAPI :8000” and “start, status, report, decision”. Temporal contains “Temporal Server :7233”, “PostgreSQL”, and the five task queues. Workers contain “PDFPipelineWorkflow”, “ContractReviewWorkflow”, “PDFSummaryWorkflow × N”, “document workers”, and “LLM workers”. External services contain “S3-compatible storage” and “OpenRouter”.
+
+Use numbered arrows: (1) upload or provide PDF paths, (2) start workflow, (3) Temporal dispatches work, (4) child workflows process documents in parallel, (5) activities heartbeat and retry, (6) LLM synthesizes the report, (7) workflow pauses for human review, (8) approve or revise, (9) durable result returns to the client. Add the callout: “The interface is replaceable; the workflow guarantees are the product.”
+~~~
+
+### Diagram quality checklist
+
+- Temporal Server is visually central rather than the React client.
+- Parent and child workflow boundaries are obvious.
+- Queues, workers, and external services are readable.
+- The durable human-review wait and approve/revise loop are visible.
+- No credentials, fake endpoints, invented queues, or generic AI brain icons appear.
+- Text remains readable at README width.
+- Arrows have one clear direction and do not cross unnecessarily.
+- Use consistent colors and line weight across all diagrams.
+
+Suggested filenames:
+
+~~~text
+docs/diagrams/01-temporal-system-overview.png
+docs/diagrams/02-pdf-pipeline.png
+docs/diagrams/03-contract-fanout.png
+docs/diagrams/04-retries-and-heartbeats.png
+docs/diagrams/05-human-review-state.png
+docs/diagrams/06-complete-execution-story.png
+~~~
+
+For a LinkedIn carousel, export the same six diagrams as 1600×900 PNGs and use the overview, fan-out, human-review, and complete-story images as the strongest four slides.
