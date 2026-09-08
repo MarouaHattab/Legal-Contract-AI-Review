@@ -58,6 +58,21 @@ test("keeps a terminal workflow view syncing until its result is loaded", () => 
   );
 });
 
+test("gives every inspected workflow instance a distinct monitor key", () => {
+  assert.equal(
+    workflow.workflowSelectionKey("pdf", "shared-id"),
+    "pdf:shared-id",
+  );
+  assert.equal(
+    workflow.workflowSelectionKey("contract_review", "shared-id"),
+    "contract_review:shared-id",
+  );
+  assert.notEqual(
+    workflow.workflowSelectionKey("pdf", "first"),
+    workflow.workflowSelectionKey("pdf", "second"),
+  );
+});
+
 test("maps execution outcomes to consistent dashboard labels and tones", () => {
   assert.deepEqual(workflow.executionPresentation("RUNNING"), {
     label: "Running",

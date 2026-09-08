@@ -259,6 +259,13 @@ export function workflowTypeLabel(workflowType: string): string {
   return workflowType;
 }
 
+export function workflowSelectionKey(
+  workflowType: WorkflowType,
+  workflowId: string,
+): string {
+  return `${workflowType}:${workflowId}`;
+}
+
 export function phaseLabel(phase: string): string {
   return PHASE_LABELS[phase] ?? phase.replaceAll("_", " ");
 }

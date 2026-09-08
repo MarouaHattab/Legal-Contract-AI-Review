@@ -26,6 +26,7 @@ import {
   summarizeExecutions,
   uiStatus,
   workflowIsTerminal,
+  workflowSelectionKey,
   workflowTypeLabel,
   type ExecutionFilter,
 } from "../lib/workflow";
@@ -344,6 +345,10 @@ export function StatusPage() {
               </div>
             </div>
             <LiveMonitor
+              key={workflowSelectionKey(
+                state.selectedWorkflowType,
+                state.selectedWorkflowId,
+              )}
               workflowId={state.selectedWorkflowId}
               workflowType={state.selectedWorkflowType}
             />
