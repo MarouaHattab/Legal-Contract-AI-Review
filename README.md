@@ -1,12 +1,10 @@
 <h1 align="center">DurableLex — Agentic Contract Intelligence with Temporal</h1>
 
+> **Durable, human-governed AI workflows for multi-contract analysis.**
 
 DurableLex is an end-to-end agentic document system built around durable workflows. It converts PDFs into traceable Markdown artifacts, analyzes contracts in parallel, synthesizes cross-document risks with an LLM, and pauses safely for a human reviewer to approve or revise the report.
 
 The browser interface is a demonstration client. The core of the project is the Temporal architecture: deterministic orchestration, isolated activities, child workflows, retries, heartbeats, Queries, Signals, Updates, and durable human-in-the-loop state.
-
-
-**Video demo** → [Watch the demo](https://github.com/user-attachments/assets/aac6d261-1684-4518-a1a8-0e259c448056) · **Demo client** → [localhost:8501](http://localhost:8501) · **Temporal UI** → [localhost:8080](http://localhost:8080) · **FastAPI docs** → [localhost:8000/docs](http://localhost:8000/docs)
 
 ## Demo
 
@@ -34,6 +32,7 @@ https://github.com/user-attachments/assets/aac6d261-1684-4518-a1a8-0e259c448056
 - [Reliability model](#reliability-model)
 - [API](#api)
 - [Run the project](#run-the-project)
+  - [Service access](#service-access)
 - [Example contract review request](#example-contract-review-request)
 - [Project structure](#project-structure)
 - [Engineering decisions](#engineering-decisions)
@@ -317,13 +316,17 @@ docker compose up --build -d
 docker compose ps
 ~~~
 
+### Service access
+
+After the stack is running, use these addresses to open the web application, FastAPI, and Temporal:
+
 | Service | Address |
 | --- | --- |
-| Demo client | http://localhost:8501 |
-| FastAPI | http://localhost:8000 |
-| FastAPI OpenAPI | http://localhost:8000/docs |
-| Temporal UI | http://localhost:8080 |
-| Temporal gRPC | localhost:7233 |
+| Web application | [http://localhost:8501](http://localhost:8501) |
+| FastAPI | [http://localhost:8000](http://localhost:8000) |
+| FastAPI documentation | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| Temporal UI | [http://localhost:8080](http://localhost:8080) |
+| Temporal gRPC | <code>localhost:7233</code> |
 
 All ten services should become running; PostgreSQL, Temporal, API, and web expose Compose health checks.
 
